@@ -82,7 +82,11 @@ struct StockDetailView: View {
     private var tabSelector: some View {
         HStack(spacing: 0) {
             ForEach(["K线", "盘口", "F10"], id: \.self) { tab in
-                Button(action: { selectedTab = ["K线", "盘口", "F10"].firstIndex(of: tab) ?? 0 }) {
+                Button(action: { 
+                    let idx = ["K线", "盘口", "F10"].firstIndex(of: tab) ?? 0
+                    selectedTab = idx
+                    if idx == 2 { viewModel.loadF10Data(code: stock.symbol) }
+                }) {
                     Text(tab)
                         .fontWeight(selectedTab == (["K线", "盘口", "F10"].firstIndex(of: tab) ?? 0) ? .bold : .regular)
                         .frame(maxWidth: .infinity)
@@ -497,10 +501,8 @@ struct F10OverviewView: View {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 40))
                     .foregroundColor(.jcpTextTertiary)
-                Button(action: { viewModel.loadF10Data(code: stock.symbol) }) {
-        Text("点击加载 F10 数据")
-            .foregroundColor(.jcpAccent)
-    }
+                Text("请在股票详情页面加载 F10 数据")
+                    .foregroundColor(.jcpTextSecondary)
             }
             Spacer()
         }
