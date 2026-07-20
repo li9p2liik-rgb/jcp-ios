@@ -54,7 +54,7 @@ struct StockDetailView: View {
                     .foregroundColor(stock.changePercent >= 0 ? .jcpRed : .jcpGreen)
             }
             
-            HStack(spacing: 20) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 infoItem("今开", stock.open.formatPrice())
                 infoItem("最高", stock.high.formatPrice())
                 infoItem("最低", stock.low.formatPrice())
@@ -63,6 +63,7 @@ struct StockDetailView: View {
                 infoItem("成交额", stock.amount.formatAmount())
             }
             .font(.caption)
+            .padding(.horizontal, 8)
         }
         .padding()
         .background(Color.jcpCardBackground)
@@ -267,12 +268,14 @@ struct KLineChartView: View {
     }
     
     private var statsBar: some View {
-        HStack {
-            Text("高: \(data.last?.high ?? 0, specifier: "%.2f")")
-            Text("低: \(data.last?.low ?? 0, specifier: "%.2f")")
-            Text("开: \(data.last?.open ?? 0, specifier: "%.2f")")
-            Text("收: \(data.last?.close ?? 0, specifier: "%.2f")")
-            Text("量: \((data.last?.volume ?? 0).formatVolume())")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                Text("高: \(data.last?.high ?? 0, specifier: "%.2f")")
+                Text("低: \(data.last?.low ?? 0, specifier: "%.2f")")
+                Text("开: \(data.last?.open ?? 0, specifier: "%.2f")")
+                Text("收: \(data.last?.close ?? 0, specifier: "%.2f")")
+                Text("量: \((data.last?.volume ?? 0).formatVolume())")
+            }
         }
         .font(.caption2)
         .foregroundColor(.jcpTextTertiary)
@@ -341,35 +344,38 @@ struct OrderBookView: View {
     }
     
     private func orderBookRow(item: OrderBookItem, isBid: Bool, maxPercent: Double) -> some View {
-        ZStack(alignment: .trailing) {
-            Rectangle()
-                .fill(isBid ? Color.jcpGreen.opacity(0.1) : Color.jcpRed.opacity(0.1))
-                .frame(width: maxPercent > 0 ? CGFloat(item.percent / maxPercent) * UIScreen.main.bounds.width * 0.7 : 0)
-                .frame(maxWidth: .infinity, alignment: isBid ? .leading : .trailing)
-            
-            HStack {
-                Text(item.price.formatPrice())
-                    .font(.caption)
-                    .foregroundColor(.jcpTextPrimary)
-                    .frame(width: 80, alignment: isBid ? .leading : .trailing)
+        GeometryReader { geo in
+            ZStack(alignment: .trailing) {
+                Rectangle()
+                    .fill(isBid ? Color.jcpGreen.opacity(0.1) : Color.jcpRed.opacity(0.1))
+                    .frame(width: maxPercent > 0 ? CGFloat(item.percent / maxPercent) * geo.size.width * 0.85 : 0)
+                    .frame(maxWidth: .infinity, alignment: isBid ? .leading : .trailing)
                 
-                Spacer()
-                
-                Text(item.size.formatVolume())
-                    .font(.caption)
-                    .foregroundColor(.jcpTextSecondary)
-                    .frame(width: 80, alignment: .center)
-                
-                Spacer()
-                
-                Text(item.total.formatVolume())
-                    .font(.caption)
-                    .foregroundColor(.jcpTextTertiary)
-                    .frame(width: 80, alignment: isBid ? .trailing : .leading)
+                HStack(spacing: 4) {
+                    Text(item.price.formatPrice())
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.jcpTextPrimary)
+                        .frame(minWidth: geo.size.width * 0.25, alignment: isBid ? .leading : .trailing)
+                    
+                    Spacer()
+                    
+                    Text(item.size.formatVolume())
+                        .font(.caption)
+                        .foregroundColor(.jcpTextSecondary)
+                        .frame(minWidth: geo.size.width * 0.2, alignment: .center)
+                    
+                    Spacer()
+                    
+                    Text(item.total.formatVolume())
+                        .font(.caption)
+                        .foregroundColor(.jcpTextTertiary)
+                        .frame(minWidth: geo.size.width * 0.25, alignment: isBid ? .trailing : .leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
         }
+        .frame(height: 28)
     }
 }
 
@@ -423,34 +429,39 @@ struct F10OverviewView: View {
                     // 财务数据
                     if let financials = f10.financials, !financials.isEmpty {
                         GroupBox("财务数据") {
-                            ScrollView(.horizontal) {
-                                VStack(spacing: 0) {
-                                    HStack(spacing: 0) {
-                                        Text("年份").frame(width: 60, alignment: .leading)
-                                        Text("营收").frame(width: 100, alignment: .trailing)
-                                        Text("净利润").frame(width: 100, alignment: .trailing)
-                                        Text("EPS").frame(width: 70, alignment: .trailing)
-                                        Text("ROE").frame(width: 70, alignment: .trailing)
-                                    }
-                                    .font(.caption)
-                                    .foregroundColor(.jcpTextTertiary)
-                                    .padding(.vertical, 4)
-                                    
-                                    Divider()
-                                    
-                                    ForEach(financials, id: \.year) { fin in
+                            VStack(spacing: 0) {
+                                GeometryReader { geo in
+                                    let col0 = geo.size.width * 0.16
+                                    let col1 = (geo.size.width * 0.84) / 4
+                                    VStack(spacing: 0) {
                                         HStack(spacing: 0) {
-                                            Text(fin.year).frame(width: 60, alignment: .leading)
-                                            Text(fin.revenue?.formatAmount() ?? "-").frame(width: 100, alignment: .trailing)
-                                            Text(fin.netProfit?.formatAmount() ?? "-").frame(width: 100, alignment: .trailing)
-                                            Text(fin.eps.map { String(format: "%.2f", $0) } ?? "-").frame(width: 70, alignment: .trailing)
-                                            Text(fin.roe.map { String(format: "%.1f%%", $0) } ?? "-").frame(width: 70, alignment: .trailing)
+                                            Text("年份").frame(width: col0, alignment: .leading)
+                                            Text("营收").frame(width: col1, alignment: .trailing)
+                                            Text("净利润").frame(width: col1, alignment: .trailing)
+                                            Text("EPS").frame(width: col1, alignment: .trailing)
+                                            Text("ROE").frame(width: col1, alignment: .trailing)
                                         }
                                         .font(.caption)
-                                        .foregroundColor(.jcpTextPrimary)
-                                        .padding(.vertical, 2)
+                                        .foregroundColor(.jcpTextTertiary)
+                                        .padding(.vertical, 4)
+                                        
+                                        Divider()
+                                        
+                                        ForEach(financials, id: \.year) { fin in
+                                            HStack(spacing: 0) {
+                                                Text(fin.year).frame(width: col0, alignment: .leading)
+                                                Text(fin.revenue?.formatAmount() ?? "-").frame(width: col1, alignment: .trailing)
+                                                Text(fin.netProfit?.formatAmount() ?? "-").frame(width: col1, alignment: .trailing)
+                                                Text(fin.eps.map { String(format: "%.2f", $0) } ?? "-").frame(width: col1, alignment: .trailing)
+                                                Text(fin.roe.map { String(format: "%.1f%%", $0) } ?? "-").frame(width: col1, alignment: .trailing)
+                                            }
+                                            .font(.caption)
+                                            .foregroundColor(.jcpTextPrimary)
+                                            .padding(.vertical, 2)
+                                        }
                                     }
                                 }
+                                .frame(height: CGFloat(financials.count * 24 + 30))
                             }
                         }
                         .groupBoxStyle(JCPGroupBoxStyle())
