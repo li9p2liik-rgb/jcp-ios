@@ -1,0 +1,82 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Generate Xcode Project with XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Enforce full-screen support in Info.plist
+        run: |
+          /usr/libexec/PlistBuddy -c "Delete :UILaunchScreen" "${INFOPLIST_FILE}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIColorName string" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIColorName empty" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIImageName string" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIImageName empty" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIImageRespectsSafeAreaInsets bool false" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UIStatusBarHidden bool false" "${INFOPLIST_FILE}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "${INFOPLIST_FILE}" 2>/dev/null || true
+        env:
+          INFOPLIST_FILE: jcp-ios/Resources/Info.plist
+
+      - name: Build Archive
+        run: |
+          cp jcp-ios/Resources/Info.plist /tmp/fixed.plist
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" /tmp/fixed.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIImageRespectsSafeAreaInsets true" /tmp/fixed.plist 2>/dev/null || true
+          cp /tmp/fixed.plist jcp-ios/Resources/Info.plist
+          xcodebuild archive \
+            -project jcp-ios.xcodeproj \
+            -scheme jcp-ios \
+            -archivePath build/jcp-ios.xcarchive \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            INFOPLIST_FILE=jcp-ios/Resources/Info.plist
+
+      - name: Create IPA
+        run: |
+          mkdir -p build/Payload
+          cp -r build/jcp-ios.xcarchive/Products/Applications/jcp-ios.app build/Payload/
+          cd build && zip -r jcp-ios.ipa Payload
+          echo "IPA created at build/jcp-ios.ipa"
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jcp-ios-ipa
+          path: build/jcp-ios.ipa
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/*.log
+            ~/Library/Logs/*.log
+          compression-level: 6
