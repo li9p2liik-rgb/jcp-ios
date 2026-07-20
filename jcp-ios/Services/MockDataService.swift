@@ -216,6 +216,6 @@ class MockDataService {
             )
         }
         
-        return F10Overview(code: code, company: company, valuation: valuation, mainIndicators: indicators, financials: financials)
+        return F10Overview(code: code, company: company, valuation: valuation, mainIndicators: indicators, financials: financials, errors: nil)
     }
 }
