@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import Combine
 
 // MARK: - AI Agent 服务
@@ -95,7 +95,7 @@ class AIAgentService {
     
     private func generateNewsAnalysis(stock: Stock, query: String) -> String {
         let templates = [
-            "## \(stock.name) 消息面情报\n\n**最新动态：**\n\n🔹 **公司公告**：\(stock.name)发布2024年年度业绩预告，预计归母净利润同比增长\(Int.random(in: 10...50))%-\(Int.random(in: 15...60))%，超出市场预期。\n\n🔹 **行业新闻**：\(stock.sector)行业迎来政策利好，工信部发布《\(stock.sector)行业高质量发展行动计划》，明确支持龙头企业做大做强。\n\n🔹 **机构观点**：多家券商发布研报看好\(stock.name)，其中\(["中信证券", "华泰证券", "国泰君安", "海通证券"].randomElement()!)给出"买入"评级，目标价\(String(format: "%.1f", stock.price * Double.random(in: 1.1...1.3)))元。\n\n🔹 **舆情监控**：网络舆情整体\(["偏正面", "正面为主", "中性偏多"].randomElement()!)，市场关注度较高。\n\n**情报汇总：** 消息面整体利好，建议关注后续催化事件。",
+            "## \(stock.name) 消息面情报\n\n**最新动态：**\n\n🔹 **公司公告**：\(stock.name)发布2024年年度业绩预告，预计归母净利润同比增长\(Int.random(in: 10...50))%-\(Int.random(in: 15...60))%，超出市场预期。\n\n🔹 **行业新闻**：\(stock.sector)行业迎来政策利好，工信部发布《\(stock.sector)行业高质量发展行动计划》，明确支持龙头企业做大做强。\n\n🔹 **机构观点**：多家券商发布研报看好\(stock.name)，其中\(["中信证券", "华泰证券", "国泰君安", "海通证券"].randomElement()!)给出「买入」评级，目标价\(String(format: "%.1f", stock.price * Double.random(in: 1.1...1.3)))元。\n\n🔹 **舆情监控**：网络舆情整体\(["偏正面", "正面为主", "中性偏多"].randomElement()!)，市场关注度较高。\n\n**情报汇总：** 消息面整体利好，建议关注后续催化事件。",
             
             "## 市场情报速递\n\n📰 **热点新闻：**\n\n• \(stock.name)新产品线投产，预计新增年收入\(Int.random(in: 10...100))亿元\n• \(stock.sector)板块今日主力资金净流入\(String(format: "%.1f", Double.random(in: 5...50)))亿元\n• 北向资金今日净买入\(stock.name)\(String(format: "%.1f", Double.random(in: 0.5...5)))亿元\n• \(stock.name)获得\(Int.random(in: 1...10))项新专利授权\n\n⚠️ **需关注：** 下周将有\(stock.name)限售股解禁，解禁市值约\(String(format: "%.1f", Double.random(in: 10...100)))亿元。"
         ]
