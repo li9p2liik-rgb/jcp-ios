@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct StockSearchView: View {
     @Environment(\.dismiss) private var dismiss
@@ -18,7 +18,7 @@ struct StockSearchView: View {
                         .foregroundColor(.jcpTextPrimary)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
-                        .onChange(of: searchText) { _, newValue in
+                        .onChange(of: searchText) { newValue in
                             searchStocks(newValue)
                         }
                     if !searchText.isEmpty {
