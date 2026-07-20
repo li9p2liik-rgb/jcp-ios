@@ -62,8 +62,9 @@ class AIAgentService {
                     ["role": "system", "content": system],
                     ["role": "user", "content": user]
                 ],
-                "temperature": 0.7,
-                "max_tokens": 2000
+                "temperature": cfg.temperature,
+                "max_tokens": cfg.maxTokens,
+                "top_p": cfg.topP
             ]
             req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
@@ -109,7 +110,8 @@ class AIAgentService {
                     ["role": "user", "content": user]
                 ],
                 "temperature": 0.5,
-                "max_tokens": 1500
+                "max_tokens": cfg.maxTokens,
+                "top_p": cfg.topP
             ]
             req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
@@ -138,9 +140,9 @@ class AIAgentService {
         let defaultId = ConfigService.shared.config.defaultAIId
         if let active = configs.first(where: { $0.id == defaultId && !$0.apiKey.isEmpty })
             ?? configs.first(where: { !$0.apiKey.isEmpty }) {
-            return (active.baseURL, active.apiKey, active.modelName)
+            return (active.baseURL, active.apiKey, active.modelName, active.temperature, active.maxTokens, active.topP)
         }
-        return ("", "", "")
+        return ("", "", "", 0.7, 2000, 1.0)
     }
 
     private func fallbackResponse(agent: Agent) -> String {
