@@ -7,7 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    TARGETED_DEVICE_FAMILY: "1,2"
+    TARGETED_DEVICE_FAMILY: "1"
 
 targets:
   jcp-ios:
@@ -21,8 +21,8 @@ targets:
       path: jcp-ios/Resources/Info.plist
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.jcp.ios
+        GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: jcp-ios/Resources/Info.plist
-        DEVELOPMENT_TEAM: ""
+        PRODUCT_BUNDLE_IDENTIFIER: com.jcp.ios
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    dependencies: []
+        TARGETED_DEVICE_FAMILY: 1
