@@ -1,0 +1,23 @@
+# Xcode
+*.xcuserdata
+*.xcworkspace/xcuserdata
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+
+# Swift PM
+.swiftpm/
+.build/
+Package.resolved
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.p12
+*.mobileprovision
+*Secret*.swift
+Config/Secrets/
