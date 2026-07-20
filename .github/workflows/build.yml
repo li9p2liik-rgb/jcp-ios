@@ -1,0 +1,63 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Generate Xcode Project with XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build Archive
+        run: |
+          xcodebuild archive \
+            -project jcp-ios.xcodeproj \
+            -scheme jcp-ios \
+            -archivePath build/jcp-ios.xcarchive \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Create IPA
+        run: |
+          mkdir -p build/Payload
+          cp -r build/jcp-ios.xcarchive/Products/Applications/jcp-ios.app build/Payload/
+          cd build && zip -r jcp-ios.ipa Payload
+          echo "IPA created at build/jcp-ios.ipa"
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jcp-ios-ipa
+          path: build/jcp-ios.ipa
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/*.log
+            ~/Library/Logs/*.log
+          compression-level: 6
