@@ -267,6 +267,8 @@ struct AIConfigEditView: View {
     @State private var topP: Double = 1.0
     @State private var testMessage = ""
     @State private var isTesting = false
+    @State private var fetchedModels: [String] = []
+    @State private var isFetchingModels = false
 
     private var isEditing: Bool { config != nil }
 
@@ -283,7 +285,26 @@ struct AIConfigEditView: View {
                             Text(label).tag(id)
                         }
                     }
-                    TextField("Model Name", text: $modelName)
+                    HStack {
+                        TextField("Model Name", text: $modelName)
+                        Button(action: { fetchModels() }) {
+                            if isFetchingModels {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.down.circle")
+                                    .foregroundColor(.jcpAccent)
+                            }
+                        }
+                        .disabled(baseURL.isEmpty || apiKey.isEmpty || isFetchingModels)
+                    }
+                    if !fetchedModels.isEmpty {
+                        Picker("Available Models", selection: $modelName) {
+                            ForEach(fetchedModels, id: \.self) { m in
+                                Text(m).tag(m)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
                 }
 
                 Section("Connection") {
@@ -396,6 +417,30 @@ struct AIConfigEditView: View {
                 }
             }
         }
+    }
+
+    private func fetchModels() {
+        guard !baseURL.isEmpty, !apiKey.isEmpty else { return }
+        isFetchingModels = true
+        fetchedModels = []
+        guard let url = URL(string: baseURL + "/models") else { isFetchingModels = false; return }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer " + apiKey, forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            var models: [String] = []
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let list = json["data"] as? [[String: Any]] {
+                models = list.compactMap { $0["id"] as? String }.filter {
+                    !$0.contains("audio") && !$0.contains("tts") && !$0.contains("whisper")
+                    && !$0.contains("dall") && !$0.contains("embedding") && !$0.contains("moderation")
+                }
+            }
+            DispatchQueue.main.async {
+                fetchedModels = models
+                isFetchingModels = false
+            }
+        }.resume()
     }
 
     private func testConnection() {
