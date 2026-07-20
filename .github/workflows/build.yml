@@ -1,4 +1,4 @@
-name: Build iOS App
+﻿name: Build iOS App
 
 on:
   push:
@@ -25,6 +25,20 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      - name: Enforce full-screen support in Info.plist
+        run: |
+          /usr/libexec/PlistBuddy -c "Delete :UILaunchScreen" "${INFOPLIST_FILE}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIColorName string" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIColorName empty" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIImageName string" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIImageName empty" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Add :UILaunchScreen:UIImageRespectsSafeAreaInsets bool false" "${INFOPLIST_FILE}"
+          /usr/libexec/PlistBuddy -c "Set :UIStatusBarHidden bool false" "${INFOPLIST_FILE}" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "${INFOPLIST_FILE}" 2>/dev/null || true
+        env:
+          INFOPLIST_FILE: jcp-ios/Resources/Info.plist
+
       - name: Build Archive
         run: |
           xcodebuild archive \
@@ -35,7 +49,8 @@ jobs:
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            INFOPLIST_FILE=jcp-ios/Resources/Info.plist
 
       - name: Create IPA
         run: |
