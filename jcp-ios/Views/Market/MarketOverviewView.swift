@@ -1,338 +1,179 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct MarketOverviewView: View {
     @EnvironmentObject var marketVM: MarketViewModel
     @State private var selectedSegment = 0
-    
-    let segments = ["快讯", "热点", "龙虎榜", "异动", "资金流", "研报"]
-    
+
+    let segments = ["News", "Trends", "LHB", "Moves", "Flow", "Reports"]
+    let icons = ["newspaper", "flame", "trophy", "bolt", "chart.bar", "doc.text"]
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.jcpBackground.ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
-                    // 大盘指数
                     MarketIndicesView(indices: marketVM.marketIndices)
-                    
-                    // 分段选择
-                    Picker("市场数据", selection: $selectedSegment) {
-                        ForEach(0..<segments.count, id: \.self) { i in
-                            Text(segments[i]).tag(i)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(0..<segments.count, id: \.self) { i in
+                                Button(action: { selectedSegment = i }) {
+                                    Label(segments[i], systemImage: icons[i])
+                                        .font(.caption)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(selectedSegment == i ? Color.jcpAccent : Color.jcpSurface)
+                                        .foregroundColor(selectedSegment == i ? .white : .jcpTextSecondary)
+                                        .cornerRadius(8)
+                                }
+                            }
                         }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 8)
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    
-                    // 内容
+
+                    // Content
                     TabView(selection: $selectedSegment) {
-                        HotTrendsView()
+                        TelegraphNewsView()
                             .tag(0)
-                        LongHuBangView()
+                        HotTrendsView()
                             .tag(1)
-                        MarketMovesView()
+                        LongHuBangView()
                             .tag(2)
-                        BoardFundFlowView()
+                        MarketMovesView()
                             .tag(3)
+                        BoardFundFlowView()
+                            .tag(4)
+                        ResearchReportsView()
+                            .tag(5)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
             }
-            .navigationTitle("行情")
+            .navigationTitle("Market")
             .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                marketVM.loadAllData()
-            }
+            .onAppear { marketVM.loadAllData() }
         }
     }
 }
 
-// MARK: - 热点舆情
+// MARK: - Hot Trends
 struct HotTrendsView: View {
     @EnvironmentObject var marketVM: MarketViewModel
-    @State private var selectedPlatform: String = "baidu"
-    
+    @State private var selectedPlatform: String = "weibo"
+
     var body: some View {
         VStack(spacing: 0) {
-            // 平台选择
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(Constants.hotTrendPlatforms, id: \.id) { platform in
-                        Button(action: { selectedPlatform = platform.id }) {
+                    ForEach(Constants.hotTrendPlatforms, id: \.id) { p in
+                        Button(action: { selectedPlatform = p.id }) {
                             HStack(spacing: 4) {
-                                Image(systemName: platform.icon)
-                                    .font(.caption)
-                                Text(platform.name)
-                                    .font(.caption)
+                                Image(systemName: p.icon).font(.caption)
+                                Text(p.name).font(.caption)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedPlatform == platform.id ? Color.jcpAccent : Color.jcpSurface)
-                            .foregroundColor(selectedPlatform == platform.id ? .white : .jcpTextSecondary)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(selectedPlatform == p.id ? Color.jcpAccent : Color.jcpSurface)
+                            .foregroundColor(selectedPlatform == p.id ? .white : .jcpTextSecondary)
                             .cornerRadius(16)
                         }
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 8).padding(.vertical, 8)
             }
-            
-            // 列表
-            if let trend = marketVM.hotTrends.first(where: { $0.platform == selectedPlatform }) {
+
+            if let trend = marketVM.hotTrends.first(where: { $0.platform == selectedPlatform }), !trend.items.isEmpty {
                 List(trend.items) { item in
                     HStack(spacing: 12) {
-                        // 排名
-                        Text("\(item.rank)")
-                            .font(.headline)
+                        Text("\(item.rank)").font(.headline).frame(width: 30)
                             .foregroundColor(item.rank <= 3 ? .jcpRed : .jcpTextSecondary)
-                            .frame(width: 30)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title)
-                                .font(.subheadline)
-                                .foregroundColor(.jcpTextPrimary)
-                                .lineLimit(2)
-                            HStack(spacing: 8) {
-                                Text("热度")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.jcpTextTertiary)
-                                Text("\(item.hot)")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.jcpAccent)
-                            }
-                        }
-                        
+                        Text(item.title).font(.subheadline).foregroundColor(.jcpTextPrimary).lineLimit(2)
                         Spacer()
-                        
-                        if item.rank <= 3 {
-                            Image(systemName: "flame.fill")
-                                .foregroundColor(.orange)
-                                .font(.caption)
-                        }
+                        if item.rank <= 3 { Image(systemName: "flame.fill").foregroundColor(.orange).font(.caption) }
                     }
-                    .padding(.vertical, 4)
-                    .listRowBackground(Color.jcpBackground)
+                    .padding(.vertical, 4).listRowBackground(Color.jcpBackground)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    marketVM.loadHotTrends()
-                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+                .refreshable { marketVM.loadHotTrends() }
             } else {
-                Spacer()
-                ProgressView()
-                Spacer()
+                ProgressView().padding().frame(maxHeight: .infinity)
             }
         }
         .background(Color.jcpBackground)
     }
 }
 
-// MARK: - 龙虎榜
+// MARK: - LongHuBang
 struct LongHuBangView: View {
     @EnvironmentObject var marketVM: MarketViewModel
-    
     var body: some View {
         VStack(spacing: 0) {
             if marketVM.longHuBangItems.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "tiger")
-                        .font(.system(size: 40))
-                        .foregroundColor(.jcpTextTertiary)
-                    Text("点击加载龙虎榜数据")
-                        .foregroundColor(.jcpTextSecondary)
-                    Button("加载数据") {
-                        marketVM.loadLongHuBang()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.jcpAccent)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-                }
-                Spacer()
+                Button("Load LongHuBang") { marketVM.loadLongHuBang() }
+                    .padding().background(Color.jcpAccent).foregroundColor(.white).cornerRadius(8)
+                    .padding(.top, 40)
             } else {
-                // 表头
-                HStack {
-                    Text("名称").frame(maxWidth: .infinity, alignment: .leading)
-                    Text("类型").frame(width: 80)
-                    Text("净买入").frame(width: 100, alignment: .trailing)
-                }
-                .font(.caption)
-                .foregroundColor(.jcpTextTertiary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                
                 List(marketVM.longHuBangItems) { item in
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name)
-                                .font(.subheadline)
-                                .foregroundColor(.jcpTextPrimary)
-                            Text(item.symbol)
-                                .font(.system(size: 10))
-                                .foregroundColor(.jcpTextTertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        Text(item.typeName)
-                            .font(.system(size: 10))
-                            .foregroundColor(.jcpAccent)
-                            .frame(width: 80)
-                        
-                        Text(item.netAmount.formatAmount())
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(item.netAmount >= 0 ? .jcpRed : .jcpGreen)
-                            .frame(width: 100, alignment: .trailing)
+                        VStack(alignment: .leading) { Text(item.name).font(.subheadline).foregroundColor(.jcpTextPrimary); Text(item.symbol).font(.system(size:10)).foregroundColor(.jcpTextTertiary) }
+                        Text(item.typeName).font(.system(size:10)).foregroundColor(.jcpAccent)
+                        Text(item.netAmount.formatAmount()).font(.subheadline).fontWeight(.medium).foregroundColor(item.netAmount >= 0 ? .jcpRed : .jcpGreen)
                     }
-                    .padding(.vertical, 4)
                     .listRowBackground(Color.jcpBackground)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    marketVM.loadLongHuBang()
-                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+                .refreshable { marketVM.loadLongHuBang() }
             }
         }
         .background(Color.jcpBackground)
     }
 }
 
-// MARK: - 盘口异动
+// MARK: - Market Moves
 struct MarketMovesView: View {
     @EnvironmentObject var marketVM: MarketViewModel
-    
     var body: some View {
         VStack(spacing: 0) {
             if marketVM.marketMoves.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 40))
-                        .foregroundColor(.jcpTextTertiary)
-                    Text("点击加载盘口异动")
-                        .foregroundColor(.jcpTextSecondary)
-                    Button("加载数据") {
-                        marketVM.loadMarketMoves()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.jcpAccent)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-                }
-                Spacer()
+                Button("Load Market Moves") { marketVM.loadMarketMoves() }
+                    .padding().background(Color.jcpAccent).foregroundColor(.white).cornerRadius(8).padding(.top, 40)
             } else {
                 List(marketVM.marketMoves) { move in
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(move.name)
-                                .font(.subheadline)
-                                .foregroundColor(.jcpTextPrimary)
-                            Text(move.symbol)
-                                .font(.system(size: 10))
-                                .foregroundColor(.jcpTextTertiary)
-                        }
-                        
+                        VStack(alignment: .leading) { Text(move.name).font(.subheadline).foregroundColor(.jcpTextPrimary); Text(move.symbol).font(.system(size:10)).foregroundColor(.jcpTextTertiary) }
                         Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(move.moveTypeName)
-                                .font(.system(size: 11))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(move.moveType == "limit_up" ? Color.jcpRed.opacity(0.2) : move.moveType == "limit_down" ? Color.jcpGreen.opacity(0.2) : Color.jcpAccent.opacity(0.2))
-                                .foregroundColor(move.moveType == "limit_up" ? .jcpRed : move.moveType == "limit_down" ? .jcpGreen : .jcpAccent)
-                                .cornerRadius(4)
-                            
-                            Text(move.time)
-                                .font(.system(size: 10))
-                                .foregroundColor(.jcpTextTertiary)
-                        }
+                        Text(move.moveTypeName).font(.system(size:10)).padding(.horizontal,6).padding(.vertical,2).background(Color.jcpAccent.opacity(0.2)).foregroundColor(.jcpAccent).cornerRadius(4)
                     }
-                    .padding(.vertical, 4)
                     .listRowBackground(Color.jcpBackground)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    marketVM.loadMarketMoves()
-                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+                .refreshable { marketVM.loadMarketMoves() }
             }
         }
         .background(Color.jcpBackground)
     }
 }
 
-// MARK: - 板块资金流
+// MARK: - Board Fund Flow
 struct BoardFundFlowView: View {
     @EnvironmentObject var marketVM: MarketViewModel
-    
     var body: some View {
         VStack(spacing: 0) {
             if marketVM.boardFundFlows.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "chart.pie")
-                        .font(.system(size: 40))
-                        .foregroundColor(.jcpTextTertiary)
-                    Text("点击加载板块资金流")
-                        .foregroundColor(.jcpTextSecondary)
-                    Button("加载数据") {
-                        marketVM.loadBoardFundFlow()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color.jcpAccent)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-                }
-                Spacer()
+                Button("Load Fund Flow") { marketVM.loadBoardFundFlow() }
+                    .padding().background(Color.jcpAccent).foregroundColor(.white).cornerRadius(8).padding(.top, 40)
             } else {
-                // 表头
-                HStack {
-                    Text("排名")
-                        .frame(width: 40, alignment: .leading)
-                    Text("板块")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("资金流向")
-                        .frame(width: 120, alignment: .trailing)
-                }
-                .font(.caption)
-                .foregroundColor(.jcpTextTertiary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                
                 List(marketVM.boardFundFlows) { flow in
                     HStack {
-                        Text("\(flow.rank)")
-                            .font(.subheadline)
-                            .foregroundColor(flow.rank <= 3 ? .jcpRed : .jcpTextSecondary)
-                            .frame(width: 40, alignment: .leading)
-                        
-                        Text(flow.boardName)
-                            .font(.subheadline)
-                            .foregroundColor(.jcpTextPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        Text(flow.fundFlow.formatAmount())
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(flow.fundFlow >= 0 ? .jcpRed : .jcpGreen)
-                            .frame(width: 120, alignment: .trailing)
+                        Text("\(flow.rank)").font(.subheadline).frame(width:40).foregroundColor(flow.rank <= 3 ? .jcpRed : .jcpTextSecondary)
+                        Text(flow.boardName).font(.subheadline).foregroundColor(.jcpTextPrimary).frame(maxWidth:.infinity, alignment:.leading)
+                        Text(flow.fundFlow.formatAmount()).font(.subheadline).fontWeight(.medium).foregroundColor(flow.fundFlow >= 0 ? .jcpRed : .jcpGreen)
                     }
-                    .padding(.vertical, 4)
                     .listRowBackground(Color.jcpBackground)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    marketVM.loadBoardFundFlow()
-                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+                .refreshable { marketVM.loadBoardFundFlow() }
             }
         }
         .background(Color.jcpBackground)
