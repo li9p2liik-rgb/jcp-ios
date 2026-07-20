@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 // Real-time market data via Sina/Tencent public APIs
 class MarketDataService {
@@ -10,7 +11,10 @@ class MarketDataService {
         return URLSession(configuration: c)
     }()
 
-    // Convert local code to Sina format: 000001 → sz000001, 600519 → sh600519
+    // Helper: decode GB18030 response from Sina API
+    private static let gbEncoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
+
+    // Convert local code to Sina format: 000001 -> sz000001, 600519 -> sh600519
     private func sinaCode(_ code: String) -> String {
         code.hasPrefix("6") ? "sh\(code)" : "sz\(code)"
     }
@@ -26,18 +30,17 @@ class MarketDataService {
         req.setValue("https://finance.sina.com.cn", forHTTPHeaderField: "Referer")
 
         session.dataTask(with: req) { data, _, error in
-            guard let data = data, let text = String(data: data, encoding: .gb_18030_2000) ?? String(data: data, encoding: .utf8) else {
-                // Fallback to mock on network error
+            guard let data = data else {
                 DispatchQueue.main.async { completion(codes.compactMap { MockDataService.shared.stockPool[$0] }) }
                 return
             }
+            let text = String(data: data, encoding: Self.gbEncoding) ?? String(data: data, encoding: .utf8) ?? ""
             var stocks: [Stock] = []
             for code in codes {
                 if let stock = self.parseSinaQuote(code: code, text: text) {
                     stocks.append(stock)
                 } else if let mock = MockDataService.shared.stockPool[code] {
                     var m = mock
-                    // Use mock data with slight random variation to simulate real-time
                     let variation = Double.random(in: -0.02...0.02)
                     m.price = m.preClose * (1 + variation)
                     m.change = m.price - m.preClose
@@ -50,7 +53,7 @@ class MarketDataService {
     }
 
     private func parseSinaQuote(code: String, text: String) -> Stock? {
-        let sinaCode = sinaCode(code)
+        let sinaCode = self.sinaCode(code)
         guard let range = text.range(of: "var hq_str_\(sinaCode)=") else { return nil }
         var line = String(text[range.upperBound...])
         if let end = line.firstIndex(of: ";") { line = String(line[..<end]) }
@@ -60,13 +63,11 @@ class MarketDataService {
               let price = Double(fields[3]), price > 0,
               let high = Double(fields[4]), let low = Double(fields[5]),
               let open = Double(fields[1]) else { return nil }
-
         let name = fields[0]
         let change = price - preClose
         let changePercent = (change / preClose) * 100
         let volume = Int64(fields[8]) ?? 0
         let amount = Double(fields[9]) ?? 0
-
         return Stock(symbol: code, name: name, price: price, change: change, changePercent: changePercent,
                      volume: volume, amount: amount, marketCap: "", sector: "", open: open, high: high, low: low, preClose: preClose)
     }
@@ -79,10 +80,11 @@ class MarketDataService {
         req.setValue("https://finance.sina.com.cn", forHTTPHeaderField: "Referer")
 
         session.dataTask(with: req) { data, _, _ in
-            guard let data = data, let text = String(data: data, encoding: .gb_18030_2000) ?? String(data: data, encoding: .utf8) else {
+            guard let data = data else {
                 DispatchQueue.main.async { completion(MockDataService.shared.marketIndices) }
                 return
             }
+            let text = String(data: data, encoding: Self.gbEncoding) ?? String(data: data, encoding: .utf8) ?? ""
             let indexMappings: [(String, String)] = [
                 ("s_sh000001", "000001"), ("s_sz399001", "399001"),
                 ("s_sz399006", "399006"), ("s_sh000688", "688888")
@@ -108,7 +110,6 @@ class MarketDataService {
 
     // MARK: - K-Line Data (Tencent API)
     func fetchKLineData(code: String, period: String, days: Int, completion: @escaping ([KLineData]) -> Void) {
-        // Tencent K-line: http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz000001,day,,,60,qfq
         let qtCode = code.hasPrefix("6") ? "sh\(code)" : "sz\(code)"
         let periodMap = ["1d": "day", "1w": "week", "1mo": "month"]
         let qtPeriod = periodMap[period] ?? "day"
@@ -138,7 +139,6 @@ class MarketDataService {
                       let vol = Double("\(arr[5])") else { continue }
                 results.append(KLineData(time: date, open: open, high: high, low: low, close: close, volume: Int64(vol), amount: nil))
             }
-            // Calc MAs
             for i in 0..<results.count {
                 if i >= 4 { results[i].ma5 = (0...4).reduce(0) { $0 + results[i-$1].close } / 5 }
                 if i >= 9 { results[i].ma10 = (0...9).reduce(0) { $0 + results[i-$1].close } / 10 }
@@ -148,10 +148,5 @@ class MarketDataService {
                 completion(results.isEmpty ? MockDataService.shared.generateKLineData(code: code, period: period, days: days) : results)
             }
         }.resume()
-    }
-
-    // MARK: - Search stocks (using local data + optional API)
-    func searchStocksLocal(_ keyword: String) -> [Stock] {
-        return MockDataService.shared.searchStocks(keyword: keyword)
     }
 }
