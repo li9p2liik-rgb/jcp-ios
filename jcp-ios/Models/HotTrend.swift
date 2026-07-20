@@ -102,6 +102,11 @@ struct AIConfig: Identifiable, Codable {
     var baseURL: String
     var modelName: String
     var isDefault: Bool
+    var temperature: Double
+    var maxTokens: Int
+    var topP: Double
+    var frequencyPenalty: Double
+    var presencePenalty: Double
 }
 
 struct AppConfig: Codable {
