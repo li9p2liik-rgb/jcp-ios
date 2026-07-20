@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct WatchlistView: View {
     @EnvironmentObject var watchlistVM: WatchlistViewModel
@@ -34,6 +34,7 @@ struct WatchlistView: View {
             }
             .navigationTitle("自选股")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear { watchlistVM.loadData() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showSearch = true }) {
