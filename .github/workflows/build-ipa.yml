@@ -6,20 +6,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      build_configuration:
-        description: 'Build configuration'
-        required: true
-        default: 'Release'
-        type: choice
-        options:
-          - Debug
-          - Release
-      sign_with_certificate:
-        description: 'Sign IPA with certificate (requires secrets)'
-        required: false
-        default: false
-        type: boolean
 
 env:
   PROJECT_NAME: JCP
@@ -35,97 +21,74 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: List Xcode versions
+        run: ls /Applications/Xcode*.app
+
+      - name: Select Xcode 16
         run: sudo xcode-select -s /Applications/Xcode_16.3.app
 
+      - name: Show Xcode path
+        run: xcode-select -p && xcodebuild -version
+
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: |
+          brew install xcodegen 2>&1 || echo "Brew install failed, trying gem..."
+          which xcodegen || gem install xcodegen
+          xcodegen --version
+
+      - name: Show project structure
+        run: |
+          echo "=== project.yml ==="
+          cat project.yml
+          echo ""
+          echo "=== Files ==="
+          find JCP -name "*.swift" | sort
 
       - name: Generate Xcode project
         run: |
           cd "${{ github.workspace }}"
-          xcodegen generate --spec project.yml
-          echo "Xcode project generated successfully"
-          ls -la JCP.xcodeproj/
+          xcodegen generate --spec project.yml --use-cache 2>&1
+          echo "Exit code: $?"
+          ls -la JCP.xcodeproj/ 2>&1 || echo "No xcodeproj generated!"
 
-      - name: Archive app (unsigned)
-        if: ${{ !inputs.sign_with_certificate }}
+      - name: Build archive (Debug first to catch errors)
+        run: |
+          xcodebuild build \
+            -project "${{ env.PROJECT_NAME }}.xcodeproj" \
+            -scheme "${{ env.SCHEME }}" \
+            -configuration Debug \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -50
+
+      - name: Archive app
+        if: success()
         run: |
           xcodebuild archive \
             -project "${{ env.PROJECT_NAME }}.xcodeproj" \
             -scheme "${{ env.SCHEME }}" \
-            -configuration ${{ inputs.build_configuration || 'Release' }} \
+            -configuration Release \
             -archivePath build/"${{ env.PROJECT_NAME }}".xcarchive \
             -destination "generic/platform=iOS" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            -quiet
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_16.3.app/Contents/Developer
+            AD_HOC_CODE_SIGNING_ALLOWED=YES 2>&1 | tail -50
 
-      - name: Archive app (signed)
-        if: ${{ inputs.sign_with_certificate }}
-        run: |
-          # Import certificate and provisioning profile
-          echo "${{ secrets.P12_BASE64 }}" | base64 --decode > certificate.p12
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
-
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import certificate.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -T /usr/bin/codesign
-
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< $(security cms -D -i profile.mobileprovision))
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
-
-          xcodebuild archive \
-            -project "${{ env.PROJECT_NAME }}.xcodeproj" \
-            -scheme "${{ env.SCHEME }}" \
-            -configuration ${{ inputs.build_configuration || 'Release' }} \
-            -archivePath build/"${{ env.PROJECT_NAME }}".xcarchive \
-            -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.PROVISIONING_PROFILE_NAME }}" \
-            CODE_SIGN_IDENTITY="${{ secrets.CODE_SIGN_IDENTITY }}" \
-            -quiet
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_16.3.app/Contents/Developer
-
-      - name: Export unsigned IPA
-        if: ${{ !inputs.sign_with_certificate }}
+      - name: Create unsigned IPA
+        if: success()
         run: |
           mkdir -p build/Payload
           cp -R build/"${{ env.PROJECT_NAME }}".xcarchive/Products/Applications/"${{ env.PROJECT_NAME }}".app build/Payload/
           cd build
           zip -r "${{ env.PROJECT_NAME }}-unsigned.ipa" Payload/
-          cd ..
-          echo "Unsigned IPA created at build/${{ env.PROJECT_NAME }}-unsigned.ipa"
-
-      - name: Export signed IPA
-        if: ${{ inputs.sign_with_certificate }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath build/"${{ env.PROJECT_NAME }}".xcarchive \
-            -exportPath build/export \
-            -exportOptionsPlist exportOptions.plist
-          mv build/export/"${{ env.PROJECT_NAME }}".ipa build/"${{ env.PROJECT_NAME }}-signed.ipa"
+          ls -la "${{ env.PROJECT_NAME }}-unsigned.ipa"
 
       - name: Upload IPA artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-${{ inputs.build_configuration || 'Release' }}
-          path: build/${{ env.PROJECT_NAME }}-*.ipa
+          name: JCP-Release
+          path: build/${{ env.PROJECT_NAME }}-unsigned.ipa
           retention-days: 7
-          compression-level: 6
-
-      - name: Upload xcarchive artifact (debug)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-xcarchive
-          path: build/${{ env.PROJECT_NAME }}.xcarchive
-          retention-days: 3
