@@ -107,6 +107,42 @@ struct AIConfig: Identifiable, Codable {
     var topP: Double
     var frequencyPenalty: Double
     var presencePenalty: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, provider, apiKey, baseURL, modelName, isDefault
+        case temperature, maxTokens, topP, frequencyPenalty, presencePenalty
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        provider = try c.decode(String.self, forKey: .provider)
+        apiKey = try c.decode(String.self, forKey: .apiKey)
+        baseURL = try c.decode(String.self, forKey: .baseURL)
+        modelName = try c.decode(String.self, forKey: .modelName)
+        isDefault = try c.decode(Bool.self, forKey: .isDefault)
+        temperature = try c.decodeIfPresent(Double.self, forKey: .temperature) ?? 0.7
+        maxTokens = try c.decodeIfPresent(Int.self, forKey: .maxTokens) ?? 2000
+        topP = try c.decodeIfPresent(Double.self, forKey: .topP) ?? 1.0
+        frequencyPenalty = try c.decodeIfPresent(Double.self, forKey: .frequencyPenalty) ?? 0
+        presencePenalty = try c.decodeIfPresent(Double.self, forKey: .presencePenalty) ?? 0
+    }
+
+    init(id: String, name: String, provider: String, apiKey: String, baseURL: String, modelName: String, isDefault: Bool, temperature: Double = 0.7, maxTokens: Int = 2000, topP: Double = 1.0, frequencyPenalty: Double = 0, presencePenalty: Double = 0) {
+        self.id = id
+        self.name = name
+        self.provider = provider
+        self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.modelName = modelName
+        self.isDefault = isDefault
+        self.temperature = temperature
+        self.maxTokens = maxTokens
+        self.topP = topP
+        self.frequencyPenalty = frequencyPenalty
+        self.presencePenalty = presencePenalty
+    }
 }
 
 struct AppConfig: Codable {
