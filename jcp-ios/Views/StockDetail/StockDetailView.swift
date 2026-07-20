@@ -149,7 +149,7 @@ struct KLineChartView: View {
             }
         }
         .background(Color.jcpBackground)
-        .onChange(of: selectedPeriod) { _, _ in
+        .onChange(of: selectedPeriod) { _ in
             // 重新加载数据
         }
     }
