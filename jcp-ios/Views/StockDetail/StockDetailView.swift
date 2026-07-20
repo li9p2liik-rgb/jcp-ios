@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 import Charts
 
 struct StockDetailView: View {
@@ -40,7 +40,7 @@ struct StockDetailView: View {
     
     private var stockHeader: some View {
         VStack(spacing: 8) {
-            HStack(alignment: .lastBaseline, spacing: 12) {
+            HStack(alignment: .lastTextBaseline, spacing: 12) {
                 Text(stock.price.formatPrice())
                     .font(.system(size: 36, weight: .bold))
                     .foregroundColor(stock.changePercent >= 0 ? .jcpRed : .jcpGreen)
