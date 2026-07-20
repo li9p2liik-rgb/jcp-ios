@@ -262,6 +262,9 @@ struct AIConfigEditView: View {
     @State private var baseURL = ""
     @State private var modelName = ""
     @State private var isDefault = false
+    @State private var temperature: Double = 0.7
+    @State private var maxTokens: Int = 2000
+    @State private var topP: Double = 1.0
     @State private var testMessage = ""
     @State private var isTesting = false
 
@@ -293,6 +296,29 @@ struct AIConfigEditView: View {
 
                 Section {
                     Toggle("Set as Default", isOn: $isDefault)
+                }
+
+                Section("Advanced Parameters") {
+                    HStack {
+                        Text("Temperature: \(String(format: "%.1f", temperature))")
+                        Spacer()
+                        Slider(value: $temperature, in: 0...2, step: 0.1)
+                            .frame(width: 150)
+                    }
+                    HStack {
+                        Text("Max Tokens")
+                        Spacer()
+                        TextField("", value: $maxTokens, format: .number)
+                            .keyboardType(.numberPad)
+                            .frame(width: 100)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("Top P: \(String(format: "%.1f", topP))")
+                        Spacer()
+                        Slider(value: $topP, in: 0...1, step: 0.05)
+                            .frame(width: 150)
+                    }
                 }
 
                 Section {
@@ -333,7 +359,12 @@ struct AIConfigEditView: View {
                             apiKey: apiKey,
                             baseURL: baseURL,
                             modelName: modelName,
-                            isDefault: isDefault
+                            isDefault: isDefault,
+                            temperature: temperature,
+                            maxTokens: maxTokens,
+                            topP: topP,
+                            frequencyPenalty: 0,
+                            presencePenalty: 0
                         )
                         onSave(newConfig)
                         dismiss()
@@ -349,6 +380,9 @@ struct AIConfigEditView: View {
                     baseURL = c.baseURL
                     modelName = c.modelName
                     isDefault = c.isDefault
+                    temperature = c.temperature
+                    maxTokens = c.maxTokens
+                    topP = c.topP
                 } else {
                     name = ""
                     provider = "openai"
@@ -356,6 +390,9 @@ struct AIConfigEditView: View {
                     baseURL = "https://api.openai.com/v1"
                     modelName = "gpt-4o"
                     isDefault = false
+                    temperature = 0.7
+                    maxTokens = 2000
+                    topP = 1.0
                 }
             }
         }
