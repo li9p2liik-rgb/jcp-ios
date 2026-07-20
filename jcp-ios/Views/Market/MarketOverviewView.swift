@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 
 struct MarketOverviewView: View {
     @EnvironmentObject var marketVM: MarketViewModel
@@ -13,7 +13,7 @@ struct MarketOverviewView: View {
                 
                 VStack(spacing: 0) {
                     // 大盘指数
-                    MarketIndicesView(indices: MockDataService.shared.marketIndices)
+                    MarketIndicesView(indices: marketVM.marketIndices)
                     
                     // 分段选择
                     Picker("市场数据", selection: $selectedSegment) {
