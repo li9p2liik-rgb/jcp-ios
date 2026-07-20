@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct WatchlistView: View {
     @EnvironmentObject var watchlistVM: WatchlistViewModel
@@ -91,11 +91,11 @@ struct WatchlistView: View {
             Text("现价")
                 .font(.caption)
                 .foregroundColor(.jcpTextTertiary)
-                .frame(width: 80, alignment: .trailing)
+                
             Text("涨跌幅")
                 .font(.caption)
                 .foregroundColor(.jcpTextTertiary)
-                .frame(width: 80, alignment: .trailing)
+                
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
@@ -173,7 +173,7 @@ struct StockRowView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.jcpTextPrimary)
-                .frame(width: 90, alignment: .trailing)
+                
             
             // 涨跌幅
             VStack(alignment: .trailing, spacing: 2) {
@@ -183,7 +183,7 @@ struct StockRowView: View {
                 Text(stock.change.formatChange())
                     .font(.caption)
             }
-            .frame(width: 80, alignment: .trailing)
+            
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(stock.changePercent >= 0 ? Color.jcpRed.opacity(0.15) : Color.jcpGreen.opacity(0.15))
