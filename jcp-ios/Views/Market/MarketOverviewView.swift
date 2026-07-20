@@ -42,7 +42,7 @@ struct MarketOverviewView: View {
             .navigationTitle("行情")
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
-                marketVM.loadHotTrends()
+                marketVM.loadAllData()
             }
         }
     }
