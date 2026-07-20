@@ -31,20 +31,25 @@ class WatchlistViewModel: ObservableObject {
     func loadData() {
         isLoading = true
         
-        // 加载市场指数
-        marketIndices = mockService.marketIndices
+        // Fetch real market indices
+        MarketDataService.shared.fetchMarketIndices { [weak self] indices in
+            self?.marketIndices = indices
+        }
         
-        // 加载自选股
+        // Start with cached stocks, then refresh with real data
         stocks = configService.getWatchlistStocks()
+        let codes = stocks.map { $0.symbol }
+        MarketDataService.shared.fetchRealTimeData(codes: codes) { [weak self] realStocks in
+            self?.stocks = realStocks
+            self?.isLoading = false
+        }
         
         marketStatus = MarketStatusInfo(
             status: .trading,
-            statusText: "交易中",
+            statusText: "Trading",
             isTradeDay: true,
             holidayName: nil
         )
-        
-        isLoading = false
     }
     
     func refresh() {
@@ -91,16 +96,24 @@ class StockDetailViewModel: ObservableObject {
     private let mockService = MockDataService.shared
     
     func loadStock(code: String) {
-        stock = mockService.stockPool[code]
+        stock = mockService.stockPool[code] // Initial display
         loadKLineData(code: code)
         loadOrderBook(code: code)
+    }
+
+    func loadRealTimeStock(code: String) {
+        MarketDataService.shared.fetchRealTimeData(codes: [code]) { [weak self] stocks in
+            if let s = stocks.first { self?.stock = s }
+        }
     }
     
     func loadKLineData(code: String) {
         isLoadingKLine = true
         let days = periodToDays(selectedPeriod)
-        kLineData = mockService.generateKLineData(code: code, period: selectedPeriod, days: days)
-        isLoadingKLine = false
+        MarketDataService.shared.fetchKLineData(code: code, period: selectedPeriod, days: days) { [weak self] data in
+            self?.kLineData = data
+            self?.isLoadingKLine = false
+        }
     }
     
     func loadOrderBook(code: String) {
@@ -199,14 +212,24 @@ class AgentRoomViewModel: ObservableObject {
     }
     
     private func buildContext(stock: Stock) -> String {
+        var ctx = """
+        Stock: \(stock.name) (\(stock.symbol))
+        Price: \(stock.price)
+        Change: \(stock.changePercent.formatPercent())
+        Open: \(stock.open)  High: \(stock.high)  Low: \(stock.low)  PreClose: \(stock.preClose)
+        Volume: \(stock.volume.formatVolume())  Amount: \(stock.amount.formatAmount())
+        Sector: \(stock.sector)  Market Cap: \(stock.marketCap)
+        
+        User Question: \(queryText.isEmpty ? "Please analyze this stock comprehensively" : queryText)
         """
-        股票: \(stock.name) (\(stock.symbol))
-        当前价: \(stock.price)
-        涨跌幅: \(stock.changePercent)%
-        行业: \(stock.sector)
-        市值: \(stock.marketCap)
-        用户问题: \(queryText.isEmpty ? "请分析该股票的投资价值" : queryText)
-        """
+        
+        // Add F10 data if available
+        let f10 = MockDataService.shared.generateF10Data(code: stock.symbol)
+        if let v = f10.valuation {
+            ctx += "\n\nValuation: PE(TTM)=\(v.peTtm?.description ?? "N/A"), PB=\(v.pb?.description ?? "N/A"), TurnoverRate=\(v.turnoverRate?.description ?? "N/A")%"
+        }
+        
+        return ctx
     }
     
     func toggleAgent(_ agent: Agent) {
@@ -229,6 +252,7 @@ class AgentRoomViewModel: ObservableObject {
 // MARK: - 市场 ViewModel
 class MarketViewModel: ObservableObject {
     
+    @Published var marketIndices: [MarketIndex] = []
     @Published var hotTrends: [HotTrendResult] = []
     @Published var longHuBangItems: [LongHuBangItem] = []
     @Published var marketMoves: [StockMove] = []
@@ -240,6 +264,17 @@ class MarketViewModel: ObservableObject {
     @Published var isLoadingFundFlow = false
     
     private let mockService = MockDataService.shared
+    
+    func loadAllData() {
+        loadMarketIndices()
+        loadHotTrends()
+    }
+    
+    func loadMarketIndices() {
+        MarketDataService.shared.fetchMarketIndices { [weak self] indices in
+            self?.marketIndices = indices
+        }
+    }
     
     func loadHotTrends() {
         isLoadingTrends = true
