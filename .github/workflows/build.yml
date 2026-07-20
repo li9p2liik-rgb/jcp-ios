@@ -1,4 +1,4 @@
-﻿name: Build iOS App
+name: Build iOS App
 
 on:
   push:
@@ -41,6 +41,10 @@ jobs:
 
       - name: Build Archive
         run: |
+          cp jcp-ios/Resources/Info.plist /tmp/fixed.plist
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" /tmp/fixed.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Set :UILaunchScreen:UIImageRespectsSafeAreaInsets true" /tmp/fixed.plist 2>/dev/null || true
+          cp /tmp/fixed.plist jcp-ios/Resources/Info.plist
           xcodebuild archive \
             -project jcp-ios.xcodeproj \
             -scheme jcp-ios \
