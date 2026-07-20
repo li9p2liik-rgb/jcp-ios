@@ -497,8 +497,10 @@ struct F10OverviewView: View {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 40))
                     .foregroundColor(.jcpTextTertiary)
-                Text("点击加载 F10 数据")
-                    .foregroundColor(.jcpTextSecondary)
+                Button(action: { viewModel.loadF10Data(code: stock.symbol) }) {
+        Text("点击加载 F10 数据")
+            .foregroundColor(.jcpAccent)
+    }
             }
             Spacer()
         }
