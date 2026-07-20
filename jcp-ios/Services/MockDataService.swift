@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 
 // MARK: - 模拟数据服务
 // 提供模拟的股票市场数据，模拟 Go 后端的 API 调用
