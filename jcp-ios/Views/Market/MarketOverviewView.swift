@@ -1,10 +1,10 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct MarketOverviewView: View {
     @EnvironmentObject var marketVM: MarketViewModel
     @State private var selectedSegment = 0
     
-    let segments = ["热点", "龙虎榜", "异动", "资金流"]
+    let segments = ["快讯", "热点", "龙虎榜", "异动", "资金流", "研报"]
     
     var body: some View {
         NavigationStack {
