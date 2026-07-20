@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TelegraphNewsView: View {
-    @State private var telegraphs: [Telegraph] = MockDataService.shared.generateTelegraphs()
+    @EnvironmentObject var marketVM: MarketViewModel
     @State private var isLoading = false
 
     var body: some View {
@@ -10,7 +10,7 @@ struct TelegraphNewsView: View {
                 Color.jcpBackground.ignoresSafeArea()
 
                 List {
-                    ForEach(telegraphs) { item in
+                    ForEach(marketVM.telegraphs) { item in
                         HStack(alignment: .top, spacing: 10) {
                             Text(item.time)
                                 .font(.system(.caption, design: .monospaced))
@@ -45,7 +45,7 @@ struct TelegraphNewsView: View {
     private func refresh() {
         isLoading = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            telegraphs = MockDataService.shared.generateTelegraphs()
+            marketVM.loadTelegraphs()
             isLoading = false
         }
     }
