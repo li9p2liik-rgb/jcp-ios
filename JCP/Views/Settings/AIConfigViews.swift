@@ -1,61 +1,76 @@
 import SwiftUI
 
+/// AI 配置详情页
 struct AIConfigDetailView: View {
     @EnvironmentObject var configService: ConfigService
     let aiConfig: AIConfig
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Form {
             Section("基本信息") {
-                HStack {
-                    Text("名称")
-                    Spacer()
-                    Text(aiConfig.name)
-                        .foregroundColor(.secondary)
-                }
-                HStack {
-                    Text("供应商")
-                    Spacer()
-                    Text(aiConfig.provider.displayName)
-                        .foregroundColor(.secondary)
-                }
-                HStack {
-                    Text("模型")
-                    Spacer()
-                    Text(aiConfig.modelName)
-                        .foregroundColor(.secondary)
-                }
+                row("名称", aiConfig.name)
+                row("供应商", aiConfig.provider.displayName)
+                row("模型", aiConfig.modelName)
+                row("接口地址", aiConfig.baseURL)
+                row("超时", "\(aiConfig.timeout)秒")
+            }
+
+            Section("参数") {
+                row("Temperature", String(format: "%.1f", aiConfig.temperature))
+                row("最大 Token", "\(aiConfig.maxTokens)")
             }
 
             Section {
-                Button("设为默认") {
-                    configService.config.defaultAIID = aiConfig.id
+                Button {
+                    configService.setDefaultAI(id: aiConfig.id)
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text(aiConfig.id == configService.config.defaultAIID ? "已是默认配置" : "设为默认")
+                        Spacer()
+                    }
                 }
                 .disabled(aiConfig.id == configService.config.defaultAIID)
 
-                Button("删除", role: .destructive) {
-                    configService.config.aiConfigs.removeAll { $0.id == aiConfig.id }
-                    if configService.config.defaultAIID == aiConfig.id {
-                        configService.config.defaultAIID = configService.config.aiConfigs.first?.id ?? ""
+                Button(role: .destructive) {
+                    configService.deleteAIConfig(id: aiConfig.id)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("删除此配置")
+                        Spacer()
                     }
                 }
             }
         }
         .navigationTitle(aiConfig.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func row(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 
-// MARK: - Add AI Config Sheet
+// MARK: - 添加 AI 配置页
 
 struct AddAIConfigView: View {
     let onAdd: (AIConfig) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
-    @State private var provider: AIProvider = .openai
-    @State private var baseURL = "https://api.openai.com"
+    @State private var provider: AIProvider = .deepseek
+    @State private var baseURL = "https://api.deepseek.com"
     @State private var apiKey = ""
-    @State private var modelName = "gpt-4o"
+    @State private var modelName = "deepseek-chat"
     @State private var temperature: Double = 0.7
     @State private var maxTokens: Int = 4096
 
@@ -64,28 +79,37 @@ struct AddAIConfigView: View {
             Form {
                 Section("基本信息") {
                     TextField("配置名称", text: $name)
+                        .textInputAutocapitalization(.never)
                     Picker("供应商", selection: $provider) {
                         ForEach(AIProvider.allCases, id: \.self) { p in
                             Text(p.displayName).tag(p)
                         }
                     }
-                        .onChange(of: provider) { _, newProvider in
-                            fillDefaults(for: newProvider)
-                        }
+                    .onChange(of: provider) { _, newProvider in
+                        fillDefaults(for: newProvider)
+                    }
                     TextField("API 地址", text: $baseURL)
                         .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
                     SecureField("API Key", text: $apiKey)
+                        .textInputAutocapitalization(.never)
                     TextField("模型名称", text: $modelName)
+                        .textInputAutocapitalization(.never)
                 }
 
                 Section("参数") {
-                    HStack {
-                        Text("Temperature")
+                    VStack {
+                        Text("Temperature: \(String(format: "%.1f", temperature))")
+                            .font(.subheadline)
                         Slider(value: $temperature, in: 0...2, step: 0.1)
-                        Text(String(format: "%.1f", temperature))
-                            .frame(width: 32)
                     }
-                    Stepper("Max Tokens: \(maxTokens)", value: $maxTokens, in: 256...128000, step: 256)
+                    Stepper("最大 Token: \(maxTokens)", value: $maxTokens, in: 256...128000, step: 256)
+                }
+
+                Section {
+                    Text("API Key 存储在本地设备，不会上传")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("添加 AI 配置")
@@ -95,7 +119,7 @@ struct AddAIConfigView: View {
                     Button("取消") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
+                    Button("保存") {
                         guard !name.isEmpty, !apiKey.isEmpty else { return }
                         onAdd(AIConfig(
                             name: name,
@@ -108,6 +132,7 @@ struct AddAIConfigView: View {
                         ))
                         dismiss()
                     }
+                    .fontWeight(.bold)
                     .disabled(name.isEmpty || apiKey.isEmpty)
                 }
             }
@@ -124,7 +149,7 @@ struct AddAIConfigView: View {
             modelName = "gemini-2.0-flash"
         case .anthropic:
             baseURL = "https://api.anthropic.com"
-            modelName = "claude-3-5-sonnet-20241022"
+            modelName = "claude-sonnet-4-20250514"
         case .deepseek:
             baseURL = "https://api.deepseek.com"
             modelName = "deepseek-chat"

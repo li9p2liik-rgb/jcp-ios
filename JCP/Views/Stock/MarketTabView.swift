@@ -18,10 +18,10 @@ struct MarketTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top indices bar
+            // 大盘指数条
             MarketIndexBar()
 
-            // Search bar
+            // 搜索栏
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
@@ -43,7 +43,7 @@ struct MarketTabView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
-            // Content
+            // 内容区
             if isSearching {
                 searchResultList
             } else {
@@ -54,23 +54,14 @@ struct MarketTabView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Default content
+    // MARK: - 默认内容
 
     private var defaultContent: some View {
         List {
             Section("快速查看") {
                 ForEach(quickStocks, id: \.0) { symbol, name in
-                    Button {
-                        Task {
-                            let stock = Stock(
-                                symbol: symbol, name: name,
-                                price: 0, change: 0, changePercent: 0,
-                                volume: 0, amount: 0,
-                                marketCap: "", sector: "",
-                                open: 0, high: 0, low: 0, preClose: 0
-                            )
-                            await marketService.selectStock(stock)
-                        }
+                    NavigationLink {
+                        StockDetailView(symbol: symbol, name: name)
                     } label: {
                         HStack {
                             Text(name)
@@ -95,21 +86,37 @@ struct MarketTabView: View {
                         Text(status.isTradeDay ? "交易日" : "休市")
                             .foregroundColor(.secondary)
                     }
+                } else {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("获取市场状态中...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Search results
+    // MARK: - 搜索结果
 
     private var searchResultList: some View {
         Group {
             if searchResults.isEmpty && !searchText.isEmpty {
-                ContentUnavailableView("未找到结果", systemImage: "magnifyingglass")
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "magnifyingglass")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("未找到 \"\(searchText)\"")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
             } else {
                 List(searchResults) { stock in
-                    Button {
-                        Task { await marketService.selectStock(stock) }
+                    NavigationLink {
+                        StockDetailView(symbol: stock.symbol, name: stock.name)
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -127,7 +134,7 @@ struct MarketTabView: View {
         }
     }
 
-    // MARK: - Actions
+    // MARK: - 操作
 
     private func performSearch(_ query: String) {
         searchTask?.cancel()

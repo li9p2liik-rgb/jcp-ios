@@ -2,16 +2,24 @@ import SwiftUI
 
 struct MeetingListView: View {
     @StateObject private var sessionService = SessionService.shared
-    @State private var searchText = ""
-    @State private var showNewMeeting = false
 
     var body: some View {
         Group {
             if sessionService.sessions.isEmpty {
-                ContentUnavailableView {
-                    Label("暂无会议", systemImage: "person.3")
-                } description: {
-                    Text("在行情页面选择股票，点击"进入会议室分析"")
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "person.3")
+                        .font(.system(size: 44))
+                        .foregroundColor(.secondary)
+                    Text("暂无会议记录")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    Text("在行情页面选择股票，点击"进入会议室分析"开始")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    Spacer()
                 }
             } else {
                 List {
@@ -34,6 +42,11 @@ struct MeetingListView: View {
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
+                                HStack {
+                                    Text("\(session.messages.count) 条消息")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
@@ -47,7 +60,9 @@ struct MeetingListView: View {
         }
         .navigationTitle("会议室")
         .toolbar {
-            EditButton()
+            if !sessionService.sessions.isEmpty {
+                EditButton()
+            }
         }
     }
 }

@@ -4,126 +4,117 @@ import Charts
 struct KLineChartView: View {
     let data: [KLineData]
 
-    @State private var visibleRange: ClosedRange<Int> = 0...100
-    @State private var dragOffset: CGFloat = 0
-
-    private let candleWidth: CGFloat = 8
-    private let spacing: CGFloat = 1
+    @State private var visibleLower: Int = 0
 
     var body: some View {
         if data.isEmpty {
-            ContentUnavailableView("暂无K线数据", systemImage: "chart.line.downtrend.xyaxis")
+            VStack(spacing: 8) {
+                Image(systemName: "chart.line.downtrend.xyaxis")
+                    .font(.title)
+                    .foregroundColor(.secondary)
+                Text("暂无K线数据")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            GeometryReader { geo in
-                let chartWidth = geo.size.width
-                let totalWidth = CGFloat(data.count) * (candleWidth + spacing)
-                let maxOffset = max(0, totalWidth - chartWidth)
+            VStack(spacing: 0) {
+                let rangeSize = min(60, data.count)
+                let upperBound = min(visibleLower + rangeSize, data.count)
+                let lowerBound = upperBound - rangeSize
+                let visibleData = Array(data[lowerBound..<upperBound])
 
-                Chart(Array(data.enumerated()), id: \.offset) { idx, item in
-                    // Candlestick body
+                Chart(Array(visibleData.enumerated()), id: \.offset) { idx, item in
+                    let realIdx = lowerBound + idx
+
+                    // K线实体
                     RectangleMark(
-                        x: .value("Index", idx),
-                        yStart: .value("Open", item.open),
-                        yEnd: .value("Close", item.close),
-                        width: .fixed(candleWidth)
+                        x: .value("", realIdx),
+                        yStart: .value("", item.open),
+                        yEnd: .value("", item.close),
+                        width: .fixed(6)
                     )
                     .foregroundStyle(item.close >= item.open ? Color.red : Color.green)
 
-                    // High-low wick
+                    // 影线
                     RectangleMark(
-                        x: .value("Index", idx),
-                        yStart: .value("Low", item.low),
-                        yEnd: .value("High", item.high),
+                        x: .value("", realIdx),
+                        yStart: .value("", item.low),
+                        yEnd: .value("", item.high),
                         width: .fixed(1)
                     )
                     .foregroundStyle(item.close >= item.open ? Color.red : Color.green)
 
-                    // MA5 line
+                    // MA5
                     if let ma5 = item.ma5 {
                         LineMark(
-                            x: .value("Index", idx),
-                            y: .value("MA5", ma5)
+                            x: .value("", realIdx),
+                            y: .value("", ma5)
                         )
                         .foregroundStyle(Color.orange)
                         .lineStyle(StrokeStyle(lineWidth: 1))
                     }
 
-                    // MA10 line
+                    // MA10
                     if let ma10 = item.ma10 {
                         LineMark(
-                            x: .value("Index", idx),
-                            y: .value("MA10", ma10)
+                            x: .value("", realIdx),
+                            y: .value("", ma10)
                         )
                         .foregroundStyle(Color.blue)
                         .lineStyle(StrokeStyle(lineWidth: 1))
                     }
 
-                    // MA20 line
+                    // MA20
                     if let ma20 = item.ma20 {
                         LineMark(
-                            x: .value("Index", idx),
-                            y: .value("MA20", ma20)
+                            x: .value("", realIdx),
+                            y: .value("", ma20)
                         )
                         .foregroundStyle(Color.purple)
                         .lineStyle(StrokeStyle(lineWidth: 1))
                     }
                 }
-                .chartXScale(domain: visibleRange)
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                        AxisValueLabel(format: KLineDateFormat())
-                    }
-                }
+                .chartXScale(domain: lowerBound...(upperBound - 1))
+                .chartXAxis(.hidden)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 5))
                 }
                 .chartPlotStyle { plot in
-                    plot
-                        .padding(.horizontal, 4)
+                    plot.padding(.horizontal, 4)
                 }
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            let delta = value.translation.width / 3
-                            let rangeSize = visibleRange.count
-                            let step = Int(delta / 20)
-                            var newLower = visibleRange.lowerBound - step
-                            var newUpper = newLower + rangeSize
-                            if newLower < 0 { newLower = 0; newUpper = rangeSize }
-                            if newUpper > data.count - 1 { newUpper = data.count - 1; newLower = newUpper - rangeSize }
-                            visibleRange = newLower...newUpper
-                        }
-                )
+
+                // 图例
+                HStack(spacing: 16) {
+                    legendItem("MA5", color: .orange)
+                    legendItem("MA10", color: .blue)
+                    legendItem("MA20", color: .purple)
+                }
+                .font(.caption2)
+                .padding(.top, 6)
+
+                // 滑动提示
+                if data.count > 60 {
+                    Text("← 左右滑动查看更多 →")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 2)
+                }
             }
-            // MA Legend
-            HStack(spacing: 16) {
-                legendItem("MA5", color: .orange)
-                legendItem("MA10", color: .blue)
-                legendItem("MA20", color: .purple)
-            }
-            .font(.caption2)
-            .padding(.top, 4)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let delta = Int(value.translation.width / 15)
+                        visibleLower = max(0, min(data.count - min(60, data.count), visibleLower - delta))
+                    }
+            )
         }
     }
 
     private func legendItem(_ label: String, color: Color) -> some View {
         HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(label)
-                .foregroundColor(.secondary)
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).foregroundColor(.secondary)
         }
-    }
-}
-
-/// Date formatter for K-line chart x-axis
-private struct KLineDateFormat: FormatStyle {
-    typealias FormatInput = Int
-    typealias FormatOutput = String
-
-    func format(_ value: Int) -> String {
-        // Return simplified date - actual impl would parse from KLineData.time
-        "\(value)"
     }
 }

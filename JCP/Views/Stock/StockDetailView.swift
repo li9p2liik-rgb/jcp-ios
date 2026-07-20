@@ -1,45 +1,86 @@
 import SwiftUI
 
 struct StockDetailView: View {
+    let symbol: String
+    let name: String
+
     @EnvironmentObject var marketService: MarketService
+    @State private var stock: Stock?
     @State private var selectedPeriod: TimePeriod = .day1
+    @State private var isLoading = true
 
     var body: some View {
         Group {
-            if let stock = marketService.currentStock {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Price header
-                        priceHeader(stock)
-
-                        Divider()
-
-                        // K-line chart
-                        periodPicker
-                        KLineChartView(data: marketService.klineData)
-                            .frame(height: 280)
-                            .padding(.vertical, 8)
-
-                        Divider()
-
-                        // Trade info
-                        tradeInfoGrid(stock)
-
-                        Divider()
-
-                        // Action buttons
-                        actionButtons(stock)
-                    }
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("加载行情数据...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .navigationTitle(stock.name)
-                .navigationBarTitleDisplayMode(.inline)
+            } else if let stock {
+                scrollContent(stock)
             } else {
-                ContentUnavailableView("请选择股票", systemImage: "chart.line.uptrend.xyaxis")
+                VStack(spacing: 12) {
+                    Image(systemName: "wifi.slash")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("行情加载失败")
+                        .foregroundColor(.secondary)
+                    Button("重试") { Task { await loadStock() } }
+                        .buttonStyle(.bordered)
+                }
             }
+        }
+        .navigationTitle(name)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await loadStock() }
+    }
+
+    // MARK: - Content
+
+    private func scrollContent(_ stock: Stock) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // 价格头部
+                priceHeader(stock)
+
+                Divider()
+
+                // K线
+                periodPicker
+                KLineChartView(data: marketService.klineData)
+                    .frame(height: 280)
+                    .padding(.vertical, 8)
+
+                if marketService.klineData.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView("加载K线...")
+                            .font(.caption)
+                        Spacer()
+                    }
+                    .frame(height: 280)
+                }
+
+                Divider()
+
+                // 交易数据
+                tradeInfoGrid(stock)
+
+                Divider()
+                    .padding(.vertical, 8)
+
+                // 操作按钮
+                actionButtons(stock)
+            }
+        }
+        .onChange(of: selectedPeriod) { _, period in
+            Task { await marketService.refreshKLine(symbol: symbol, period: period) }
         }
     }
 
-    // MARK: - Price Header
+    // MARK: - 价格头部
 
     private func priceHeader(_ stock: Stock) -> some View {
         VStack(spacing: 4) {
@@ -58,7 +99,7 @@ struct StockDetailView: View {
         .padding(.vertical, 16)
     }
 
-    // MARK: - Period Picker
+    // MARK: - K线周期选择
 
     private var periodPicker: some View {
         Picker("周期", selection: $selectedPeriod) {
@@ -68,17 +109,9 @@ struct StockDetailView: View {
         }
         .pickerStyle(.segmented)
         .padding(.horizontal)
-        .onChange(of: selectedPeriod) { _, period in
-            Task {
-                await marketService.refreshKLine(
-                    symbol: marketService.currentStock?.symbol ?? "",
-                    period: period
-                )
-            }
-        }
     }
 
-    // MARK: - Trade Info Grid
+    // MARK: - 交易数据
 
     private func tradeInfoGrid(_ stock: Stock) -> some View {
         LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 3), spacing: 12) {
@@ -103,7 +136,7 @@ struct StockDetailView: View {
         }
     }
 
-    // MARK: - Actions
+    // MARK: - 操作按钮
 
     private func actionButtons(_ stock: Stock) -> some View {
         VStack(spacing: 12) {
@@ -118,7 +151,7 @@ struct StockDetailView: View {
 
             HStack(spacing: 12) {
                 Button {
-                    // Add to watchlist
+                    // 加自选
                 } label: {
                     Label("加自选", systemImage: "star")
                         .frame(maxWidth: .infinity)
@@ -128,7 +161,7 @@ struct StockDetailView: View {
                 Button {
                     // F10
                 } label: {
-                    Label("F10", systemImage: "doc.text")
+                    Label("F10 资料", systemImage: "doc.text")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -137,7 +170,19 @@ struct StockDetailView: View {
         .padding()
     }
 
-    // MARK: - Format helpers
+    // MARK: - Helpers
+
+    private func loadStock() async {
+        isLoading = true
+        await marketService.selectStock(Stock(
+            symbol: symbol, name: name,
+            price: 0, change: 0, changePercent: 0,
+            volume: 0, amount: 0,
+            marketCap: "", sector: "",
+            open: 0, high: 0, low: 0, preClose: 0
+        ))
+        isLoading = marketService.currentStock == nil
+    }
 
     private func formatVolume(_ v: Double) -> String {
         if v > 1_0000_0000 { return String(format: "%.2f亿手", v / 1_0000_0000) }

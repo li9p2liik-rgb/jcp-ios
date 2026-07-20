@@ -29,16 +29,51 @@ struct MeetingRoomView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Stock info header
+            // 股票信息头
             stockInfoBar
 
-            // Messages
+            // 消息列表
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
+                        // 欢迎提示
+                        if messages.isEmpty {
+                            VStack(spacing: 16) {
+                                Spacer().frame(height: 40)
+                                Image(systemName: "person.3.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.secondary)
+                                Text("财经会议室")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                Text("向小韭菜提问，AI 专家团将进行多轮分析讨论")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("例如：")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\"\(stock.name)现在可以买入吗？\"")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    Text("\"分析一下\(stock.name)的技术面\"")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                                Spacer().frame(height: 20)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+
                         ForEach(messages) { msg in
                             messageBubble(msg)
                         }
+
                         if meetingService.isRunning {
                             HStack {
                                 ProgressView()
@@ -60,7 +95,7 @@ struct MeetingRoomView: View {
 
             Divider()
 
-            // Input area
+            // 输入栏
             inputBar
         }
         .navigationTitle("会议室")
@@ -70,14 +105,14 @@ struct MeetingRoomView: View {
                 let session = sessionService.createSession(
                     stockSymbol: stock.symbol,
                     stockName: stock.name,
-                    title: "\(stock.name)分析"
+                    title: "\(stock.name) 分析"
                 )
                 sessionID = session.id
             }
         }
     }
 
-    // MARK: - Stock Info Bar
+    // MARK: - 股票信息条
 
     private var stockInfoBar: some View {
         HStack {
@@ -92,6 +127,7 @@ struct MeetingRoomView: View {
                 Text(String(format: "%.2f", stock.price))
                     .font(.subheadline)
                     .fontWeight(.bold)
+                    .foregroundColor(stock.changePercent >= 0 ? .red : .green)
             }
         }
         .padding(.horizontal)
@@ -99,14 +135,13 @@ struct MeetingRoomView: View {
         .background(Color(.systemGray6))
     }
 
-    // MARK: - Message Bubble
+    // MARK: - 消息气泡
 
     private func messageBubble(_ msg: ChatMessage) -> some View {
         let isModerator = msg.agentId == "moderator"
         let isSummary = msg.msgType == .summary
 
         return HStack(alignment: .top, spacing: 8) {
-            // Avatar
             Text(agentAvatar(for: msg.agentId))
                 .font(.title3)
                 .frame(width: 32, height: 32)
@@ -117,7 +152,6 @@ struct MeetingRoomView: View {
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
-                // Header
                 HStack {
                     Text(msg.agentName ?? msg.agentId)
                         .font(.caption)
@@ -132,13 +166,8 @@ struct MeetingRoomView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    Spacer()
-                    Text(msg.timestamp, style: .time)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
 
-                // Content
                 Text(LocalizedStringKey(msg.content))
                     .font(.subheadline)
                     .padding(10)
@@ -153,7 +182,7 @@ struct MeetingRoomView: View {
         .padding(.vertical, 2)
     }
 
-    // MARK: - Input Bar
+    // MARK: - 输入栏
 
     private var inputBar: some View {
         HStack(spacing: 8) {
@@ -161,13 +190,18 @@ struct MeetingRoomView: View {
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(3)
                 .focused($inputFocused)
+                .submitLabel(.send)
+                .onSubmit { submitQuery() }
 
             Button {
                 submitQuery()
             } label: {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.title2)
-                    .foregroundColor(userInput.trimmingCharacters(in: .whitespaces).isEmpty ? .gray : .blue)
+                    .foregroundColor(
+                        userInput.trimmingCharacters(in: .whitespaces).isEmpty || meetingService.isRunning
+                            ? .gray : .blue
+                    )
             }
             .disabled(userInput.trimmingCharacters(in: .whitespaces).isEmpty || meetingService.isRunning)
         }
@@ -176,7 +210,7 @@ struct MeetingRoomView: View {
         .background(Color(.systemBackground))
     }
 
-    // MARK: - Actions
+    // MARK: - 操作
 
     private func submitQuery() {
         let query = userInput.trimmingCharacters(in: .whitespaces)
@@ -184,7 +218,6 @@ struct MeetingRoomView: View {
         userInput = ""
         inputFocused = false
 
-        // Add user message
         let userMsg = ChatMessage(
             agentId: "user",
             agentName: "老韭菜",
@@ -196,7 +229,6 @@ struct MeetingRoomView: View {
         guard let sid = sessionID else { return }
         sessionService.addMessage(to: sid, message: userMsg)
 
-        // Run meeting
         Task {
             do {
                 try await meetingService.runMeeting(
@@ -210,7 +242,7 @@ struct MeetingRoomView: View {
                 let errMsg = ChatMessage(
                     agentId: "system",
                     agentName: "系统",
-                    content: "出错了：\(error.localizedDescription)"
+                    content: "出错：\(error.localizedDescription)"
                 )
                 messages.append(errMsg)
                 if let sid = sessionID {
@@ -222,13 +254,14 @@ struct MeetingRoomView: View {
 
     private func agentAvatar(for agentId: String) -> String {
         switch agentId {
-        case "moderator": return "🤖"
-        case "bull": return "🐂"
-        case "bear": return "🐻"
-        case "quant": return "📊"
-        case "macro": return "🌍"
-        case "news": return "📡"
-        default: return "👤"
+        case "moderator": return "\u{1F916}"
+        case "bull": return "\u{1F402}"
+        case "bear": return "\u{1F43B}"
+        case "quant": return "\u{1F4CA}"
+        case "macro": return "\u{1F30D}"
+        case "news": return "\u{1F4E1}"
+        case "user": return "\u{1F9D1}"
+        default: return "\u{1F464}"
         }
     }
 }

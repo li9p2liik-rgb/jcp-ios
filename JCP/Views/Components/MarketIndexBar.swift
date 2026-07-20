@@ -4,23 +4,22 @@ struct MarketIndexBar: View {
     @EnvironmentObject var marketService: MarketService
 
     var body: some View {
-        if marketService.indices.isEmpty {
-            Text("加载指数中...")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.vertical, 6)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                if marketService.indices.isEmpty {
+                    Text("加载指数中...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
                     ForEach(marketService.indices) { index in
                         indexView(index)
                     }
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 6)
             }
-            .background(Color(.systemBackground))
+            .padding(.horizontal)
+            .padding(.vertical, 6)
         }
+        .background(Color(.systemBackground))
     }
 
     private func indexView(_ index: MarketIndex) -> some View {

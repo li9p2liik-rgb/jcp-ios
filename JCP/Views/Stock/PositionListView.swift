@@ -4,34 +4,54 @@ struct PositionListView: View {
     @State private var positions: [StockPosition] = []
     @State private var showAddSheet = false
 
+    private let storageURL: URL = {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("positions.json")
+    }()
+
     var body: some View {
         Group {
             if positions.isEmpty {
-                ContentUnavailableView {
-                    Label("暂无持仓", systemImage: "briefcase")
-                } description: {
-                    Text("点击右上角 + 添加持仓")
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "briefcase")
+                        .font(.system(size: 44))
+                        .foregroundColor(.secondary)
+                    Text("暂无持仓")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    Text("点击右上角 + 添加持仓记录")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
             } else {
                 List {
                     Section {
                         HStack {
-                            Text("总资产")
+                            Text("总市值")
                             Spacer()
-                            Text(String(format: "¥%.2f", totalMarketValue))
+                            Text(String(format: "%.2f", totalMarketValue))
                                 .fontWeight(.bold)
+                        }
+                        HStack {
+                            Text("总成本")
+                            Spacer()
+                            Text(String(format: "%.2f", totalCost))
                         }
                         HStack {
                             Text("总盈亏")
                             Spacer()
                             Text(String(format: "%+.2f", totalProfit))
                                 .foregroundColor(totalProfit >= 0 ? .red : .green)
+                                .fontWeight(.medium)
                         }
                         HStack {
                             Text("收益率")
                             Spacer()
                             Text(String(format: "%+.2f%%", totalReturnRate))
                                 .foregroundColor(totalReturnRate >= 0 ? .red : .green)
+                                .fontWeight(.medium)
                         }
                     }
 
@@ -59,28 +79,13 @@ struct PositionListView: View {
         .onAppear(perform: load)
     }
 
-    // MARK: - Computed
-
-    private var totalMarketValue: Double {
-        positions.reduce(0) { $0 + $1.marketValue }
-    }
-    private var totalCost: Double {
-        positions.reduce(0) { $0 + Double($1.shares) * $1.costPrice }
-    }
-    private var totalProfit: Double {
-        totalMarketValue - totalCost
-    }
+    private var totalMarketValue: Double { positions.reduce(0) { $0 + $1.marketValue } }
+    private var totalCost: Double { positions.reduce(0) { $0 + Double($1.shares) * $1.costPrice } }
+    private var totalProfit: Double { totalMarketValue - totalCost }
     private var totalReturnRate: Double {
         guard totalCost > 0 else { return 0 }
         return totalProfit / totalCost * 100
     }
-
-    // MARK: - Persistence
-
-    private let storageURL: URL = {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("positions.json")
-    }()
 
     private func save() {
         guard let data = try? JSONEncoder().encode(positions) else { return }
@@ -99,8 +104,6 @@ struct PositionListView: View {
     }
 }
 
-// MARK: - Position Row
-
 struct PositionRow: View {
     let position: StockPosition
 
@@ -110,14 +113,14 @@ struct PositionRow: View {
                 Text(position.name)
                     .fontWeight(.medium)
                 Spacer()
-                Text(String(format: "¥%.2f", position.marketValue))
+                Text(String(format: "%.2f", position.marketValue))
                     .fontWeight(.medium)
             }
             HStack {
                 Text("\(position.shares)股")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(String(format: "成本 ¥%.2f", position.costPrice))
+                Text(String(format: "成本 %.2f", position.costPrice))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
@@ -129,8 +132,6 @@ struct PositionRow: View {
         }
     }
 }
-
-// MARK: - Add Position Sheet
 
 struct AddPositionView: View {
     let onAdd: (StockPosition) -> Void
@@ -144,12 +145,15 @@ struct AddPositionView: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("股票名称", text: $name)
-                TextField("代码 (如 sh600519)", text: $symbol)
-                TextField("持仓数量", text: $shares)
-                    .keyboardType(.numberPad)
-                TextField("成本价", text: $costPrice)
-                    .keyboardType(.decimalPad)
+                Section("股票信息") {
+                    TextField("股票名称 (如 紫金矿业)", text: $name)
+                    TextField("代码 (如 sh601899)", text: $symbol)
+                        .textInputAutocapitalization(.never)
+                    TextField("持仓数量 (股)", text: $shares)
+                        .keyboardType(.numberPad)
+                    TextField("成本价格", text: $costPrice)
+                        .keyboardType(.decimalPad)
+                }
             }
             .navigationTitle("添加持仓")
             .navigationBarTitleDisplayMode(.inline)
@@ -158,18 +162,16 @@ struct AddPositionView: View {
                     Button("取消") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
-                        guard let s = Int(shares),
-                              let price = Double(costPrice),
-                              !name.isEmpty else { return }
+                    Button("保存") {
+                        guard let s = Int(shares), let price = Double(costPrice), !name.isEmpty else { return }
                         onAdd(StockPosition(
                             symbol: symbol.isEmpty ? name : symbol,
-                            name: name,
-                            shares: s,
-                            costPrice: price
+                            name: name, shares: s, costPrice: price
                         ))
                         dismiss()
                     }
+                    .fontWeight(.bold)
+                    .disabled(name.isEmpty || shares.isEmpty || costPrice.isEmpty)
                 }
             }
         }
