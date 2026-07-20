@@ -87,7 +87,7 @@ struct F10MainIndicator: Codable {
 struct F10Overview: Codable {
     let code: String
     let company: F10Company?
-    let valuation: StockValuation?
+    var valuation: StockValuation?
     let mainIndicators: [F10MainIndicator]?
     let financials: [F10FinancialData]?
     let errors: [String: String]?
