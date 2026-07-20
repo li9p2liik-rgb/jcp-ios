@@ -75,6 +75,7 @@ struct AgentRoomEntryView: View {
                         .foregroundColor(.jcpTextSecondary)
                 }
                 .padding(.top, 30)
+            .onAppear { watchlistVM.loadData() }
                 
                 // 选择股票
                 VStack(alignment: .leading, spacing: 12) {
