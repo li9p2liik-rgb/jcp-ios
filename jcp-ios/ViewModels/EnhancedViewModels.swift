@@ -1,10 +1,6 @@
 ﻿import Foundation
-import Combine
 
-// MARK: - Settings ViewModel (see ViewModels.swift)
-// SettingsViewModel is defined in ViewModels.swift
-
-// MARK: - Telegraph ViewModel
+// Telegraph ViewModel only - SettingsViewModel is in ViewModels.swift
 
 class TelegraphViewModel: ObservableObject {
     @Published var telegraphs: [Telegraph] = []
