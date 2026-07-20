@@ -21,12 +21,9 @@ class ConfigService: ObservableObject {
            let config = try? JSONDecoder().decode(AppConfig.self, from: data) {
             self.config = config
         } else {
-            self.config = AppConfig(
-                aiConfigs: [],
-                defaultAIId: "",
-                theme: "dark",
-                watchlist: Constants.defaultWatchlist
-            )
+            // Migration: clear old data, start fresh
+            UserDefaults.standard.removeObject(forKey: "app_config")
+            self.config = AppConfig(aiConfigs: [], defaultAIId: "", theme: "dark", watchlist: Constants.defaultWatchlist)
         }
         
         if let symbols = UserDefaults.standard.stringArray(forKey: "watchlist_symbols") {
@@ -64,6 +61,7 @@ class ConfigService: ObservableObject {
         if config.aiConfigs.count == 1 {
             config.defaultAIId = aiConfig.id
         }
+        objectWillChange.send()
     }
     
     func deleteAIConfig(id: String) {
