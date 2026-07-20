@@ -1,4 +1,4 @@
-import SwiftUI
+﻿import SwiftUI
 
 struct AgentRoomView: View {
     let stock: Stock
@@ -136,7 +136,7 @@ struct AgentRoomView: View {
                 }
                 .padding()
             }
-            .onChange(of: viewModel.messages.count) { _, _ in
+            .onChange(of: viewModel.messages.count) { _ in
                 if let last = viewModel.messages.last {
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)
