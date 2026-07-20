@@ -81,22 +81,25 @@ class WatchlistViewModel: ObservableObject {
     }
 }
 
-// MARK: - 股票详情 ViewModel
+// MARK: - Stock Detail ViewModel (Real API)
 class StockDetailViewModel: ObservableObject {
-    
     @Published var stock: Stock?
     @Published var kLineData: [KLineData] = []
     @Published var orderBook: OrderBook?
     @Published var f10Data: F10Overview?
+    @Published var valuation: StockValuation?
     @Published var selectedPeriod = "1d"
     @Published var isLoadingKLine = false
     @Published var isLoadingF10 = false
     @Published var showF10 = false
-    
+    @Published var position: StockPosition?
+    @Published var researchReports: [ResearchReport] = []
+
     private let mockService = MockDataService.shared
-    
+    private let api = RealAPIService.shared
+
     func loadStock(code: String) {
-        stock = mockService.stockPool[code] // Initial display
+        stock = mockService.stockPool[code]
         loadKLineData(code: code)
         loadOrderBook(code: code)
     }
@@ -106,7 +109,7 @@ class StockDetailViewModel: ObservableObject {
             if let s = stocks.first { self?.stock = s }
         }
     }
-    
+
     func loadKLineData(code: String) {
         isLoadingKLine = true
         let days = periodToDays(selectedPeriod)
@@ -115,18 +118,34 @@ class StockDetailViewModel: ObservableObject {
             self?.isLoadingKLine = false
         }
     }
-    
+
     func loadOrderBook(code: String) {
-        orderBook = mockService.generateOrderBook(code: code)
+        api.fetchOrderBook(code: code) { [weak self] book in
+            self?.orderBook = book ?? MockDataService.shared.generateOrderBook(code: code)
+        }
     }
-    
+
     func loadF10Data(code: String) {
         isLoadingF10 = true
-        f10Data = mockService.generateF10Data(code: code)
-        showF10 = true
-        isLoadingF10 = false
+        api.fetchF10Overview(code: code) { [weak self] overview in
+            self?.f10Data = overview
+            self?.api.fetchValuation(code: code) { val in
+                if var f10 = self?.f10Data {
+                    f10.valuation = val
+                    self?.f10Data = f10
+                }
+                self?.isLoadingF10 = false
+                self?.showF10 = true
+            }
+        }
     }
-    
+
+    func loadResearchReports(code: String) {
+        api.fetchResearchReports(code: code) { [weak self] reports in
+            self?.researchReports = reports
+        }
+    }
+
     private func periodToDays(_ period: String) -> Int {
         switch period {
         case "1m": return 1
@@ -137,9 +156,7 @@ class StockDetailViewModel: ObservableObject {
         default: return 60
         }
     }
-}
-
-// MARK: - AI 智库 ViewModel
+}// MARK: - AI 智库 ViewModel
 class AgentRoomViewModel: ObservableObject {
     
     @Published var messages: [ChatMessage] = []
@@ -249,104 +266,97 @@ class AgentRoomViewModel: ObservableObject {
     }
 }
 
-// MARK: - 市场 ViewModel
+// MARK: - Market ViewModel (Real API)
 class MarketViewModel: ObservableObject {
-    
     @Published var marketIndices: [MarketIndex] = []
     @Published var hotTrends: [HotTrendResult] = []
     @Published var longHuBangItems: [LongHuBangItem] = []
     @Published var marketMoves: [StockMove] = []
     @Published var boardFundFlows: [BoardFundFlow] = []
-    @Published var selectedPlatform: String?
+    @Published var telegraphs: [Telegraph] = []
+    @Published var researchReports: [ResearchReport] = []
+    @Published var selectedPlatform = "weibo"
     @Published var isLoadingTrends = false
     @Published var isLoadingLHB = false
     @Published var isLoadingMoves = false
     @Published var isLoadingFundFlow = false
-    
-    private let mockService = MockDataService.shared
-    
+
+    private let api = RealAPIService.shared
+
     func loadAllData() {
         loadMarketIndices()
         loadHotTrends()
+        loadTelegraphs()
     }
-    
+
     func loadMarketIndices() {
         MarketDataService.shared.fetchMarketIndices { [weak self] indices in
             self?.marketIndices = indices
         }
     }
-    
+
     func loadHotTrends() {
         isLoadingTrends = true
-        
-        let platforms = ["baidu", "weibo", "douyin", "bilibili", "toutiao", "zhihu"]
+        let platforms = Constants.hotTrendPlatforms.map { $0.id }
+        let group = DispatchGroup()
         var results: [HotTrendResult] = []
-        
+
         for platform in platforms {
-            let items = mockService.generateHotTrends(platform: platform)
-            let platformName = Constants.hotTrendPlatforms.first { $0.id == platform }?.name ?? platform
-            results.append(HotTrendResult(platform: platform, platformName: platformName, items: items, lastUpdated: Date()))
+            group.enter()
+            api.fetchHotTrend(platform: platform) { [weak self] result in
+                let name = Constants.hotTrendPlatforms.first { $0.id == platform }?.name ?? platform
+                if let r = result {
+                    results.append(HotTrendResult(platform: platform, platformName: name, items: r.items, lastUpdated: Date()))
+                } else {
+                    // Fallback to mock
+                    results.append(HotTrendResult(platform: platform, platformName: name,
+                        items: MockDataService.shared.generateHotTrends(platform: platform), lastUpdated: Date()))
+                }
+                group.leave()
+            }
         }
-        
-        hotTrends = results
-        isLoadingTrends = false
+        group.notify(queue: .main) { [weak self] in
+            self?.hotTrends = results
+            self?.isLoadingTrends = false
+        }
     }
-    
+
     func loadLongHuBang() {
         isLoadingLHB = true
-        longHuBangItems = mockService.generateLongHuBang()
-        isLoadingLHB = false
+        api.fetchLongHuBang(pageSize: 20, pageNumber: 1) { [weak self] items in
+            self?.longHuBangItems = items.isEmpty ? MockDataService.shared.generateLongHuBang() : items
+            self?.isLoadingLHB = false
+        }
     }
-    
+
     func loadMarketMoves() {
         isLoadingMoves = true
-        
-        let moveTypes = ["large_trade", "price_spike", "volume_surge", "limit_up", "limit_down"]
-        let moveTypeNames = ["大单成交", "股价异动", "成交量突增", "涨停", "跌停"]
-        var moves: [StockMove] = []
-        
-        let stocks = Array(mockService.stockPool.values.shuffled().prefix(20))
-        for stock in stocks {
-            let idx = Int.random(in: 0..<moveTypes.count)
-            moves.append(StockMove(
-                symbol: stock.symbol,
-                name: stock.name,
-                moveType: moveTypes[idx],
-                moveTypeName: moveTypeNames[idx],
-                price: stock.price,
-                changePercent: Double.random(in: -10...10),
-                time: "\(String(format: "%02d", Int.random(in: 9...14))):\(String(format: "%02d", Int.random(in: 0...59)))"
-            ))
+        api.fetchStockMoves(moveType: "all") { [weak self] items in
+            self?.marketMoves = items
+            self?.isLoadingMoves = false
         }
-        
-        marketMoves = moves.sorted { $0.time > $1.time }
-        isLoadingMoves = false
     }
-    
+
     func loadBoardFundFlow() {
         isLoadingFundFlow = true
-        
-        let categories = ["全部板块", "行业板块", "概念板块"]
-        let category = categories.randomElement()!
-        
-        let boardNames = ["半导体", "新能源", "AI概念", "白酒", "医药", "金融", "地产", "军工", "消费电子", "光伏"]
-        var flows: [BoardFundFlow] = []
-        
-        for (i, name) in boardNames.enumerated() {
-            flows.append(BoardFundFlow(
-                boardCode: String(format: "%04d", i + 1),
-                boardName: name,
-                fundFlow: Double.random(in: -50_0000_0000...50_0000_0000),
-                rank: i + 1
-            ))
+        api.fetchBoardFundFlow(category: "all") { [weak self] items in
+            self?.boardFundFlows = items
+            self?.isLoadingFundFlow = false
         }
-        
-        boardFundFlows = flows.sorted { $0.rank < $1.rank }
-        isLoadingFundFlow = false
     }
-}
 
-// MARK: - 设置 ViewModel
+    func loadTelegraphs() {
+        api.fetchTelegraphs { [weak self] items in
+            self?.telegraphs = items
+        }
+    }
+
+    func loadResearchReports(code: String) {
+        api.fetchResearchReports(code: code) { [weak self] items in
+            self?.researchReports = items
+        }
+    }
+}// MARK: - 设置 ViewModel
 class SettingsViewModel: ObservableObject {
     
     @Published var aiConfigs: [AIConfig] = []
