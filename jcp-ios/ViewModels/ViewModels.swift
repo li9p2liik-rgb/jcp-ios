@@ -247,7 +247,9 @@ class AgentRoomViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-    }\n\n    private func buildContext(stock: Stock) -> String {
+    }
+
+    private func buildContext(stock: Stock) -> String {
         var ctx = """
         Stock: \(stock.name) (\(stock.symbol))
         Price: \(stock.price)
