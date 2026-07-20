@@ -176,59 +176,78 @@ class AgentRoomViewModel: ObservableObject {
         currentStock = stock
     }
     
-    func startAnalysis() {
+            func startAnalysis() {
         guard let stock = currentStock, !selectedAgents.isEmpty else { return }
         guard !isAnalyzing else { return }
-        
+
         isAnalyzing = true
         analysisProgress = 0
         messages.removeAll()
-        
-        // 添加开场白
+
+        let memoryCtx = MemoryStoreService.shared.buildContextPrompt(stockCode: stock.symbol)
+
         let opening = ChatMessage(
             agentId: "system",
-            agentName: "系统",
-            content: "## 开始分析 \(stock.name)(\(stock.symbol))\n\n**当前价格:** \(stock.price)元  |  **涨跌幅:** \(stock.changePercent.formatPercent())\n\n邀请以下专家进行多维度分析：\n\(selectedAgents.map { "- \($0.name)（\($0.role.rawValue)）" }.joined(separator: "\n"))",
+            agentName: "System",
+            content: "## Analysis: \(stock.name)(\(stock.symbol))\n\n**Price:** \(stock.price)  |  **Change:** \(stock.changePercent.formatPercent())\n\nAnalysts: \(selectedAgents.map { $0.name }.joined(separator: ", "))" + (memoryCtx.isEmpty ? "" : "\n\n*Historical memory loaded*"),
             msgType: .opening,
             round: 1
         )
         messages.append(opening)
-        
-        // 逐个获取 Agent 分析
+
+        let baseContext = buildContext(stock: stock)
         let totalAgents = selectedAgents.count
-        for (index, agent) in selectedAgents.enumerated() {
-            let context = buildContext(stock: stock)
-            
-            aiService.generateAgentResponse(agent: agent, stock: stock, query: queryText, context: context)
-                .sink { [weak self] message in
-                    guard let self = self else { return }
-                    self.messages.append(message)
-                    self.analysisProgress = Double(index + 1) / Double(totalAgents)
-                    
-                    // 最后一个 Agent 完成后生成摘要
-                    if index == totalAgents - 1 {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.generateSummary()
-                        }
+
+        // Multi-round chain: each agent sees previous responses
+        func runAgent(at index: Int, history: String) {
+            guard index < totalAgents else {
+                DispatchQueue.main.async {
+                    self.generateSummary()
+                }
+                return
+            }
+
+            let agent = selectedAgents[index]
+            var fullCtx = baseContext
+            if !memoryCtx.isEmpty { fullCtx += "\n" + memoryCtx }
+            if !history.isEmpty {
+                fullCtx += "\n\n[Previous Round]\n\(history)"
+            }
+
+            aiService.generateAgentResponse(agent: agent, stock: stock, query: queryText, context: fullCtx)
+                .sink { msg in
+                    DispatchQueue.main.async {
+                        self.messages.append(msg)
+                        self.analysisProgress = Double(index + 1) / Double(totalAgents)
+                    }
+                    let newHistory = history + "\n[\(agent.name)]: \(msg.content)\n---\n"
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                        runAgent(at: index + 1, history: newHistory)
                     }
                 }
                 .store(in: &cancellables)
         }
+
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
+            runAgent(at: 0, history: "")
+        }
     }
-    
+
     private func generateSummary() {
         guard let stock = currentStock else { return }
-        
+
         aiService.generateSummary(messages: messages, stock: stock)
             .sink { [weak self] summary in
                 self?.messages.append(summary)
                 self?.isAnalyzing = false
                 self?.analysisProgress = 1.0
+
+                if let msgs = self?.messages, let code = self?.currentStock?.symbol {
+                    MemoryStoreService.shared.saveMemory(stockCode: code, messages: msgs, summary: summary.content)
+                }
             }
             .store(in: &cancellables)
-    }
-    
-    private func buildContext(stock: Stock) -> String {
+    }private func buildContext(stock: Stock) -> String {
         var ctx = """
         Stock: \(stock.name) (\(stock.symbol))
         Price: \(stock.price)
